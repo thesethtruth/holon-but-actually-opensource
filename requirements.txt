@@ -1,0 +1,4 @@
+agentpy
+ipykernel
+black
+seaborn
