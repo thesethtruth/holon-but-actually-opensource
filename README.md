@@ -3,22 +3,30 @@
 > *wat voor snarky comments kan je nog meer bedenken?*  - Gillis Hommen
 
 
-## Installation
+## Setting up your development environment in VSCode:
+
+### Recommended terminal
+
+Use `bash` as default profile:
+`CTRL + SHIFT + P` > `Terminal: Select Default Profile` > `git bash`.
+
+Now all terminals opened in VSCode will be directly openend with bash. 
+
+> For this to work you might with `conda` need to register the `bash` terminal. To this end, open the `anaconda prompt` and type `conda init bash`. 
+
+### Add the correct Python interpreter
+
+Use the `agentpy` conda environment in VSCode by pressing:
+`CTRL + SHIFT + P` > `Python: Select Interperter` > `python 3.10.6 ('agentpy')`.
+
+### Install the Python modules
 
 ```bash
 conda create -n agentpy
 conda activate agentpy
 conda install pip
 pip install -r requirements.txt
-```
-
-## Running
-```
-python main.py
-```
-
-
-## Protips:
+``` 
 
 
 ### Interactive mode
@@ -58,14 +66,10 @@ To make sure you always use it, add the following lines to your `settings.json` 
 }
 ```
 
-### Recommended terminal
+## Running
+```
+python main.py
+```
 
-Use `bash` as default profile:
-`CTRL + SHIFT + P` > `Terminal: Select Default Profile` > `git bash`.
 
-Now all terminals opened in VSCode will be directly openend with bash. 
 
-### Add the correct Python interpreter
-
-Use the `agentpy` conda environment in VSCode by pressing:
-`CTRL + SHIFT + P` > `Python: Select Interperter` > `python 3.10.6 ('agentpy')`.
