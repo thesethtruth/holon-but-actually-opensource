@@ -1,5 +1,6 @@
 # holon-but-actually-opensource
 
+![img](img/100python.png)
 > *wat voor snarky comments kan je nog meer bedenken?*  - Gillis Hommen
 
 
