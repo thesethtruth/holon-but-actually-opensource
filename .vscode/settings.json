@@ -1,4 +1,6 @@
 {
   "spellright.language": ["en", "nl"],
-  "spellright.documentTypes": ["markdown", "latex", "plaintext"]
+  "spellright.documentTypes": ["markdown", "latex", "plaintext"],
+  "python.linting.flake8Enabled": true,
+  "python.linting.enabled": false
 }

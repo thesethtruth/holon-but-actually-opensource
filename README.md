@@ -33,7 +33,7 @@ pip install -r requirements.txt
 ### Interactive mode
 By installing `requirements.txt` you get `ipykernel` which is **supoah** nice for development. 
 
-Use by pressing `CTRL + SHIFT + P` > `keybindings.json` and adding:
+Use by pressing `CTRL + SHIFT + P` > `Preferences: Open Keyboard Shortcuts (JSON)` and adding:
 ```json
 [
     {
@@ -54,7 +54,7 @@ Now press `shift+enter` when focused on the `main.py`. Now an interactive window
 
 By installing `requirements.txt` you've also installed `black` which is the nicest formatter out there for Python (this is _not_ an opinion).
 
-To make sure you always use it, add the following lines to your `settings.json` (`CTRL + SHIFT + P` > `open settings (json)`). 
+To make sure you always use it, add the following lines to your `settings.json` (`CTRL + SHIFT + P` > `Preferences: Open User Settings (JSON)`). 
 
 ```json
 {
