@@ -10,6 +10,8 @@
 #     def agent_method(self):
 #         # Define custom actions here
 #         pass
+import random
+import numpy as np
 
 
 class GridNode:
@@ -29,11 +31,15 @@ class GridNode:
         self.totalExportedEnergy_kWh = 0
 
     def connectToParent(self, pop_gridNodes):
-        for x in pop_gridNodes:
-            if x.nodeID == self.parentNodeID:
-                self.parentNode = x
-                x.connectToChild(self)
-                # print('Connected gridNode to parent node!')
+        x = [x for x in pop_gridNodes if x.nodeID == self.parentNodeID]
+        if bool(x):
+            x = x[0]
+            self.parentNode = x
+            x.connectToChild(self)
+
+        # for x in pop_gridNodes:
+        #     if x.nodeID == self.parentNodeID:
+        #         # print('Connected gridNode to parent node!')
 
     def connectToChild(self, childNode):
         self.childConnections.append(childNode)
@@ -72,40 +78,87 @@ class GridConnection:
         self.connectedAssets = []
 
     def connectToParents(self, pop_gridNodes):
-        for x in pop_gridNodes:
-            if x.nodeID == self.parentNodeElectricID:
-                self.parentNodeElectric = x
-                x.connectToChild(self)
-                # print('Connected gridConnection to electric parent node!')
-            if x.nodeID == self.parentNodeHeatID:
-                self.parentNodeHeat = x
-                x.connectToChild(self)
-                # print('Connected gridConnection to heating parent node!')
+        # for x in pop_gridNodes:
+        #     if x.nodeID == self.parentNodeElectricID:
+        x = [x for x in pop_gridNodes if x.nodeID == self.parentNodeElectricID]
+        if bool(x):
+            x = x[0]
+            self.parentNodeElectric = x
+            x.connectToChild(self)
+
+        x = [x for x in pop_gridNodes if x.nodeID == self.parentNodeHeatID]
+        if bool(x):
+            x = x[0]
+            self.parentNodeHeat = x
+            x.connectToChild(self)
+
+    # print('Connected gridConnection to electric parent node!')
+    # if x.nodeID == self.parentNodeHeatID:
+
+    # print('Connected gridConnection to heating parent node!')
 
     def connectToChild(self, connectedAsset):
         self.connectedAssets.append(connectedAsset)
 
-    def calculateEnergyBalance(self, timestep_h, df_profiles):
-        self.v_currentLoadElectricity_kW = 0
+    def manageAssets(self, t, timestep_h, df_profiles):
+        # print("Managing EnergyAssets")
         for e in self.connectedAssets:
+            if e.energyAssetType == "EV":
+                # print(
+                #     "Managing EV, next time at "
+                #     + str(self.starttimes[self.tripNo] / 60)
+                #     + " hours"
+                # )
+                if t > self.starttimes[self.tripNo] / 60 and e.available:
+                    e.startTrip()
+                if t > self.endtimes[self.tripNo] / 60 and not e.available:
+                    e.endTrip(self.distances[self.tripNo])
+                    self.starttimes[self.tripNo] += 7 * 24 * 60
+                    self.endtimes[self.tripNo] += 7 * 24 * 60
+                    self.tripNo += 1
+                    if self.tripNo == self.nbTrips:
+                        self.tripNo = 0
+                e.setPowerFraction(self.capacity_kW / e.capacity_kW)
+                e.runAsset(timestep_h)
+
             if e.energyAssetType == "WINDMILL":
                 e.setPowerFraction(df_profiles.wind_e_prod_normalized.array[0])
                 e.runAsset()
             if e.energyAssetType == "PHOTOVOLTAIC":
                 e.setPowerFraction(df_profiles.solar_e_prod_normalized.array[0])
                 e.runAsset()
-            print("Looping over connected assets")
+
+    def calculateEnergyBalance(self, timestep_h):
+        self.v_currentLoadElectricity_kW = 0
+        for e in self.connectedAssets:
+            # print("Looping over connected assets")
             self.v_currentLoadElectricity_kW += (
                 e.v_currentConsumptionElectric_kW - e.v_currentProductionElectric_kW
             )
-        if abs(self.v_currentLoadElectricity_kW) > 0:
-            print(
-                "Connection "
-                + self.connectionID
-                + " has electric load of "
-                + str(self.v_currentLoadElectricity_kW)
-                + " kW"
-            )
+        # if abs(self.v_currentLoadElectricity_kW) > 0:
+        #     print(
+        #         "Connection "
+        #         + self.connectionID
+        #         + " has electric load of "
+        #         + str(self.v_currentLoadElectricity_kW)
+        #         + " kW"
+        #     )
+
+    def loadCarRides(self, tripsarray):
+        self.starttimes = []
+        self.endtimes = []
+        self.distances = []
+
+        rowNr = random.randint(1, 581)
+        self.nbTrips = int(tripsarray[rowNr, 1])
+        for i in np.arange(0, self.nbTrips):
+            # print("Index " + str(i))
+            self.starttimes.append(tripsarray[rowNr, 2 + i * 3])
+            self.endtimes.append(tripsarray[rowNr, 3 + i * 3])
+            self.distances.append(tripsarray[rowNr, 4 + i * 3])
+        self.tripNo = 0
+        # print("RowNr " + str(rowNr) + ", Car rides " + str(nbTrips))
+        # print("Last trip distance is " + str(self.distances[nbTrips - 1]) + " km")
 
 
 class ConnectionOwner:

@@ -25,6 +25,10 @@ undergroundTemp_degC = df_params.value[
 ].values[0]
 # print('Underground temp ' + str(undergroundTemp_degC))
 
+# Load car trips
+tripsexcell = pd.ExcelFile("./AlbatrossProcessedVehicleTrips.xlsx")
+tripsarray = pd.read_excel(tripsexcell).to_numpy()
+
 
 ################
 ## Populate agent populations
@@ -50,7 +54,6 @@ for x in pop_gridNodes:
     x.connectToParent(pop_gridNodes)
     # print(x.parentNode.nodeID)
 
-
 # Initialize gridConnections
 for idx in df_gridConnections.index.array:
     pop_gridConnections.append(
@@ -64,6 +67,11 @@ for idx in df_gridConnections.index.array:
     )
 
     # Initialize default assets?
+    if df_gridConnections.type.array[idx] == "HOUSE":
+        pop_energyAssets.append(
+            EA_EV(99, df_gridConnections.id.array[idx], "EV", 100, 0.2, 0.5, 60)
+        )
+    pop_gridConnections[idx].loadCarRides(tripsarray)
 
 for idx in df_energyAssets.index.array:
     if df_energyAssets.type.array[idx] == "PRODUCTION":
@@ -97,7 +105,7 @@ for x in pop_gridConnections:
 ##############################################
 ## Simulate! Loop over timesteps
 for t in np.arange(
-    0, 10, timestep_h
+    0, 24 * 7, timestep_h
 ):  ## Just 10 steps for now, for testing. Will be 8760 later of course.
     ## Update profiles
     df_currentprofiles = df_profiles.loc[[t]]
@@ -106,7 +114,8 @@ for t in np.arange(
 
     ## Propagate powerflows
     for c in pop_gridConnections:
-        c.calculateEnergyBalance(timestep_h, df_currentprofiles)
+        c.manageAssets(t, timestep_h, df_currentprofiles)
+        c.calculateEnergyBalance(timestep_h)
 
     for n in pop_gridNodes:
         n.calculateEnergyBalance(timestep_h)
