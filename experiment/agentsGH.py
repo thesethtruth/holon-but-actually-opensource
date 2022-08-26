@@ -10,8 +10,10 @@
 #     def agent_method(self):
 #         # Define custom actions here
 #         pass
+from genericpath import exists
 import random
 import numpy as np
+from energyAssets import EnergyAsset
 
 
 class GridNode:
@@ -76,6 +78,9 @@ class GridConnection:
         self.parentNodeElectricID = parentNodeElectricID
         self.parentNodeHeatID = parentNodeHeatID
         self.connectedAssets = []
+        self.EA_HeatingSystem = []
+        self.EA_EV = []
+        self.EA_ThermalStorage = []
 
     def connectToParents(self, pop_gridNodes):
         # for x in pop_gridNodes:
@@ -97,36 +102,77 @@ class GridConnection:
 
     # print('Connected gridConnection to heating parent node!')
 
-    def connectToChild(self, connectedAsset):
-        self.connectedAssets.append(connectedAsset)
+    def connectToChild(self, connectedAsset: EnergyAsset):
+
+        if connectedAsset.energyAssetType == "EV":
+            self.EA_EV = connectedAsset
+        elif connectedAsset.energyAssetType == "Gas Burner":
+            self.EA_HeatingSystem = connectedAsset
+        elif connectedAsset.energyAssetType == "Thermal Storage":
+            self.EA_ThermalStorage = connectedAsset
+        else:
+            self.connectedAssets.append(connectedAsset)
 
     def manageAssets(self, t, timestep_h, df_profiles):
         # print("Managing EnergyAssets")
         for e in self.connectedAssets:
-            if e.energyAssetType == "EV":
-                # print(
-                #     "Managing EV, next time at "
-                #     + str(self.starttimes[self.tripNo] / 60)
-                #     + " hours"
-                # )
-                if t > self.starttimes[self.tripNo] / 60 and e.available:
-                    e.startTrip()
-                if t > self.endtimes[self.tripNo] / 60 and not e.available:
-                    e.endTrip(self.distances[self.tripNo])
-                    self.starttimes[self.tripNo] += 7 * 24 * 60
-                    self.endtimes[self.tripNo] += 7 * 24 * 60
-                    self.tripNo += 1
-                    if self.tripNo == self.nbTrips:
-                        self.tripNo = 0
-                e.setPowerFraction(self.capacity_kW / e.capacity_kW)
-                e.runAsset(timestep_h)
-
             if e.energyAssetType == "WINDMILL":
                 e.setPowerFraction(df_profiles.wind_e_prod_normalized.array[0])
                 e.runAsset()
             if e.energyAssetType == "PHOTOVOLTAIC":
                 e.setPowerFraction(df_profiles.solar_e_prod_normalized.array[0])
                 e.runAsset()
+
+        if bool(self.EA_EV):
+            # print(
+            #     "Managing EV, next time at "
+            #     + str(self.starttimes[self.tripNo] / 60)
+            #     + " hours"
+            # )
+            if t > self.starttimes[self.tripNo] / 60 and self.EA_EV.available:
+                self.EA_EV.startTrip()
+            if t > self.endtimes[self.tripNo] / 60 and not self.EA_EV.available:
+                self.EA_EV.endTrip(self.distances[self.tripNo])
+                self.starttimes[self.tripNo] += 7 * 24 * 60
+                self.endtimes[self.tripNo] += 7 * 24 * 60
+                self.tripNo += 1
+                if self.tripNo == self.nbTrips:
+                    self.tripNo = 0
+            self.EA_EV.setPowerFraction(self.capacity_kW / self.EA_EV.capacity_kW)
+            self.EA_EV.runAsset(timestep_h)
+        if bool(self.EA_HeatingSystem) and bool(self.EA_ThermalStorage):
+            tempSetpoint_degC = 20
+            houseTemp_degC = self.EA_ThermalStorage.storageTemp_degC
+            self.EA_ThermalStorage.updateAmbientTemperature(
+                df_profiles.ambientTemperature_degC.array[0]
+            )
+            if houseTemp_degC < tempSetpoint_degC:
+                # //traceln("heatCapacity heatingSystem " + p_spaceHeatingAsset.p_energyAssetInstance.getHeatCapacity_kW());
+                powerDemand_kW = (
+                    (tempSetpoint_degC - houseTemp_degC)
+                    * (self.EA_ThermalStorage.heatCapacity_JpK)
+                    / 3.6e6
+                )
+                self.EA_HeatingSystem.setPowerFraction(
+                    powerDemand_kW / self.EA_HeatingSystem.capacity_kW
+                )
+                self.EA_ThermalStorage.setPowerFraction(
+                    powerDemand_kW / self.EA_ThermalStorage.capacity_kW
+                )
+                # //traceln("Power fraction heating " + p_spaceHeatingAsset.v_powerFraction_fr);
+            else:
+                self.EA_HeatingSystem.setPowerFraction(0)
+                self.EA_ThermalStorage.setPowerFraction(0)
+            self.EA_HeatingSystem.runAsset(timestep_h)
+            self.EA_ThermalStorage.runAsset(timestep_h)
+            # print(
+            #     "house temp in house "
+            #     + self.connectionID
+            #     + " is "
+            #     + str(houseTemp_degC)
+            #     + ", heating system power fraction is "
+            #     + str(self.EA_HeatingSystem.v_powerFraction_fr)
+            # )
 
     def calculateEnergyBalance(self, timestep_h):
         self.v_currentLoadElectricity_kW = 0

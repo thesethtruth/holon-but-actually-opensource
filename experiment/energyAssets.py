@@ -1,5 +1,13 @@
 from cmath import isnan
 from types import NoneType
+from enum import Enum
+
+
+class OL_EnergyCarrier(Enum):
+    ELECTRICITY = 1
+    HEAT = 2
+    METHANE = 3
+    HYDROGEN = 4
 
 
 class EnergyAsset:
@@ -11,6 +19,13 @@ class EnergyAsset:
         self.v_powerFraction_fr = 0
         self.v_currentConsumptionElectric_kW = 0
         self.v_currentProductionElectric_kW = 0
+        self.v_currentConsumptionHeat_kW = 0
+        self.v_currentProductionHeat_kW = 0
+        self.v_currentConsumptionMethane_kW = 0
+        self.v_currentProductionMethane_kW = 0
+        self.v_currentConsumptionHydrogen_kW = 0
+        self.v_currentProductionHydrogen_kW = 0
+        self.energyUsed_kWh = 0
 
     def connectToParent(self, pop_gridConnection):
         x = [x for x in pop_gridConnection if x.connectionID == self.parentConnectionID]
@@ -27,7 +42,12 @@ class EnergyAsset:
         # )
 
     def setPowerFraction(self, powerFraction_fr):
-        self.v_powerFraction_fr = powerFraction_fr
+        self.v_powerFraction_fr = min(
+            1, max(-1, powerFraction_fr)
+        )  # Limited to range between -1 and 1
+
+    def getEnergyUsed(self):
+        return self.energyUsed_kWh
 
 
 class EA_Consumption(EnergyAsset):
@@ -53,7 +73,57 @@ class EA_StorageElectric(EnergyAsset):
         super().__init__(AssetID, parentConnectionID, type, capacity_kW)
 
     def runAsset(self):
-        self.v_currentProductionElectric_kW = self.v_powerFraction_fr * self.capacity_kW
+        self.v_currentConsumptionElectric_kW = max(
+            0, self.v_powerFraction_fr * self.capacity_kW
+        )
+        self.v_currentProductionElectric_kW = -min(
+            0, self.v_powerFraction_fr * self.capacity_kW
+        )
+
+
+class EA_StorageHeat(EnergyAsset):
+    def __init__(
+        self,
+        AssetID,
+        parentConnectionID,
+        type,
+        capacity_kW,
+        heatCapacity_JpK,
+        lossFactor_WpK,
+        initialTemp_degC,
+        ambientTemp_degC,
+    ) -> None:
+        super().__init__(AssetID, parentConnectionID, type, capacity_kW)
+        self.heatCapacity_JpK = heatCapacity_JpK
+        self.lossFactor_WpK = lossFactor_WpK
+        self.storageTemp_degC = initialTemp_degC
+        self.ambientTemp_degC = ambientTemp_degC
+
+    def runAsset(self, timestep_h):
+        heatloss_kWh = (
+            self.lossFactor_WpK
+            * (self.storageTemp_degC - self.ambientTemp_degC)
+            * timestep_h
+            / 1000
+        )
+        self.energyUsed_kWh += heatloss_kWh
+        energyDelta_kWh = (
+            self.v_powerFraction_fr * self.capacity_kW * timestep_h
+        ) - heatloss_kWh
+        deltaTemp_degC = energyDelta_kWh / (self.heatCapacity_JpK / 3.6e6)
+        self.storageTemp_degC += deltaTemp_degC
+        self.v_currentProductionHeat_kW = -min(
+            0, self.v_powerFraction_fr * self.capacity_kW
+        )
+        self.v_currentConsumptionHeat_kW = max(
+            0, self.v_powerFraction_fr * self.capacity_kW
+        )
+
+    def getStorageTemp(self):
+        return self.storageTemp_degC
+
+    def updateAmbientTemperature(self, ambientTemperature_degC):
+        self.ambientTemp_degC = ambientTemperature_degC
 
 
 class EA_EV(EA_StorageElectric):
@@ -70,7 +140,7 @@ class EA_EV(EA_StorageElectric):
         super().__init__(AssetID, parentConnectionID, type, capacity_kW)
         self.available = True
         self.energyConsumption_kWhpkm = energyConsumption_kWhpkm
-        self.energyUsed_kWh = 0
+        # self.energyUsed_kWh = 0
         self.stateOfCharge_r = initialStateOfCharge_r
         self.batteryCapacity_kWh = batteryCapacity_kWh
         self.v_powerFraction_fr = 1
@@ -119,3 +189,52 @@ class EA_EV(EA_StorageElectric):
 
     def getCurrentStateOfChange(self):
         return self.stateOfCharge_r
+
+
+class EA_Conversion(EnergyAsset):
+    def __init__(
+        self,
+        AssetID,
+        parentConnectionID,
+        type,
+        capacity_kW,
+        efficiency_r,
+        energyCarrierProduced: OL_EnergyCarrier,
+        energyCarrierConsumed: OL_EnergyCarrier,
+    ) -> None:
+        super().__init__(AssetID, parentConnectionID, type, capacity_kW)
+
+        self.eta_r = efficiency_r
+        self.energyCarrierProduced = energyCarrierProduced
+        self.energyCarrierConsumed = energyCarrierConsumed
+
+
+class EA_GasBurner(EA_Conversion):
+    def __init__(
+        self,
+        AssetID,
+        parentConnectionID,
+        type,
+        capacity_kW,
+        efficiency_r,
+        energyCarrierProduced: OL_EnergyCarrier,
+        energyCarrierConsumed: OL_EnergyCarrier,
+    ) -> None:
+        super().__init__(
+            AssetID,
+            parentConnectionID,
+            type,
+            capacity_kW,
+            efficiency_r,
+            energyCarrierProduced,
+            energyCarrierConsumed,
+        )
+
+    def runAsset(self, timestep_h):
+        self.v_currentProductionHeat_kW = self.capacity_kW * self.v_powerFraction_fr
+        self.v_currentConsumptionMethane_kW = (
+            self.v_currentProductionHeat_kW / self.eta_r
+        )
+        self.energyUsed_kWh += timestep_h * (
+            self.v_currentConsumptionMethane_kW - self.v_currentProductionHeat_kW
+        )  # This represents losses!

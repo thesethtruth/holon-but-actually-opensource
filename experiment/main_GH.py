@@ -68,10 +68,38 @@ for idx in df_gridConnections.index.array:
 
     # Initialize default assets?
     if df_gridConnections.type.array[idx] == "HOUSE":
+        # add EV
         pop_energyAssets.append(
             EA_EV(99, df_gridConnections.id.array[idx], "EV", 100, 0.2, 0.5, 60)
         )
-    pop_gridConnections[idx].loadCarRides(tripsarray)
+        pop_gridConnections[idx].loadCarRides(tripsarray)
+
+        # add thermal storage (ie. building thermal model)
+        pop_energyAssets.append(
+            EA_StorageHeat(
+                99,
+                df_gridConnections.id.array[idx],
+                "Thermal Storage",
+                100,
+                1e7,
+                100,
+                20,
+                df_profiles.ambientTemperature_degC.array[0],
+            )
+        )
+        # add heating system
+        pop_energyAssets.append(
+            EA_GasBurner(
+                99,
+                df_gridConnections.id.array[idx],
+                "Gas Burner",
+                30,
+                0.95,
+                OL_EnergyCarrier.HEAT,
+                OL_EnergyCarrier.METHANE,
+            )
+        )
+
 
 for idx in df_energyAssets.index.array:
     if df_energyAssets.type.array[idx] == "PRODUCTION":
@@ -97,8 +125,8 @@ for e in pop_energyAssets:
     e.connectToParent(pop_gridConnections)
 
 # Make links between gridConnections and gridNodes
-for x in pop_gridConnections:
-    x.connectToParents(pop_gridNodes)
+for c in pop_gridConnections:
+    c.connectToParents(pop_gridNodes)
     # print(x.parentNode.nodeID)
 
 
