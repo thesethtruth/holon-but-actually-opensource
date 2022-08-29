@@ -2,7 +2,10 @@ import numpy as np
 import pandas as pd
 from agentsGH import *
 from energyAssets import *
+import time
 
+
+t1 = time.time()
 ##############
 ## Load data from excells
 # Load agents from config excell
@@ -129,11 +132,10 @@ for c in pop_gridConnections:
     c.connectToParents(pop_gridNodes)
     # print(x.parentNode.nodeID)
 
-
 ##############################################
 ## Simulate! Loop over timesteps
 for t in np.arange(
-    0, 24 * 7, timestep_h
+    0, 24 * 7 * 52, timestep_h
 ):  ## Just 10 steps for now, for testing. Will be 8760 later of course.
     ## Update profiles
     df_currentprofiles = df_profiles.loc[[t]]
@@ -151,7 +153,11 @@ for t in np.arange(
     ## Financial transactions
 
     ## timestep print
-    print("Timestep at t=" + str(t) + " hours")
+    # print("Timestep at t=" + str(t) + " hours")
+
+t2 = time.time()
+print("Elapsed time " + str(t2 - t1))
+
 print(
     "Total imported electricity in model "
     + str([x.totalImportedEnergy_kWh for x in pop_gridNodes if x.nodeID == "E1"])

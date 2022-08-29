@@ -159,8 +159,8 @@ class EA_EV(EA_StorageElectric):
             self.v_currentProductionElectric_kW = discharge_kW
             self.v_currentConsumptionElectric_kW = -discharge_kW
             self.stateOfCharge_r -= discharge_kW / self.batteryCapacity_kWh
-            if abs(discharge_kW) > 0:
-                print("Charging EV with " + str(-discharge_kW) + " kW")
+            # if abs(discharge_kW) > 0:
+            #     print("Charging EV with " + str(-discharge_kW) + " kW")
         else:
             self.v_currentProductionElectric_kW = 0
             self.v_currentConsumptionElectric_kW = 0
@@ -168,7 +168,7 @@ class EA_EV(EA_StorageElectric):
     def startTrip(self):
         if self.available:
             self.available = False
-            print("Leaving on trip!")
+            # print("Leaving on trip!")
         else:
             print("Car is already away from home!")
 
@@ -179,11 +179,11 @@ class EA_EV(EA_StorageElectric):
             self.stateOfCharge_r -= (
                 distance * self.energyConsumption_kWhpkm / self.batteryCapacity_kWh
             )
-            print(
-                "Returned from trip! Used "
-                + str(distance * self.energyConsumption_kWhpkm)
-                + " kWh"
-            )
+            # print(
+            #     "Returned from trip! Used "
+            #     + str(distance * self.energyConsumption_kWhpkm)
+            #     + " kWh"
+            # )
             if self.stateOfCharge_r < 0:
                 print("Car returned home with empty battery!")
 
