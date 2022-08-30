@@ -9,7 +9,7 @@ t1 = time.time()
 ##############
 ## Load data from excells
 # Load agents from config excell
-configexcell = pd.ExcelFile("./db_backboneConfig.xlsx")
+configexcell = pd.ExcelFile("./db_backboneConfig_moreagents.xlsx")
 df_gridNodes = pd.read_excel(configexcell, "config_netNodes")
 df_gridConnections = pd.read_excel(configexcell, "config_netConnections")
 df_actors = pd.read_excel(configexcell, "config_actors")
@@ -38,7 +38,10 @@ tripsarray = pd.read_excel(tripsexcell).to_numpy()
 pop_gridNodes = []
 pop_gridConnections = []
 pop_energyAssets = []
-
+pop_connectionOwners = []
+pop_energyHolons = []
+pop_energySuppliers = []
+pop_gridOperators = []
 
 # Initialize gridNodes
 for idx in df_gridNodes.index.array:
@@ -123,6 +126,26 @@ for idx in df_energyAssets.index.array:
                 df_energyAssets.capacity_electric_kw.array[idx],
             )
         )
+
+#
+for idx in df_actors.index.array:
+    if df_actors.agenttype.array[idx] == "CONNECTIONOWNER":
+        pop_connectionOwners.append(
+            ConnectionOwner(
+                df_actors.id.array[idx],
+                df_actors.parent_actor.array[idx],
+                df_actors.type.array[idx],
+            )
+        )
+    if df_actors.agenttype.array[idx] == "ENERGYSUPPLIER":
+        pop_energySuppliers.append(EnergySupplier(df_actors.id.array[idx]))
+
+    if df_actors.agenttype.array[idx] == "ENERGYHOLON":
+        pop_energyHolons.append(EnergyHolon(df_actors.id.array[idx],df_actors.id.parent_actor[idx]))
+    
+    if df_actors.agenttype.array[idx] == "GRIDOPERATOR":
+        pop_gridOperators.append(GridOperator(df_actors.id.array[idx]))
+
 # Make links between energyAssets and gridConnections
 for e in pop_energyAssets:
     e.connectToParent(pop_gridConnections)
@@ -132,24 +155,36 @@ for c in pop_gridConnections:
     c.connectToParents(pop_gridNodes)
     # print(x.parentNode.nodeID)
 
+
 ##############################################
 ## Simulate! Loop over timesteps
 for t in np.arange(
     0, 24 * 7 * 52, timestep_h
 ):  ## Just 10 steps for now, for testing. Will be 8760 later of course.
     ## Update profiles
-    df_currentprofiles = df_profiles.loc[[t]]
+    df_currentprofiles = df_profiles.loc[[round(t)]]
 
     ## Propagate incentives
 
     ## Propagate powerflows
+    # t0gC = time.time()
     for c in pop_gridConnections:
         c.manageAssets(t, timestep_h, df_currentprofiles)
         c.calculateEnergyBalance(timestep_h)
+    # print(
+    #     "Time spent on gridConnections in one timestep: "
+    #     + str(time.time() - t0gC)
+    #     + " seconds"
+    # )
 
+    # t0gN = time.time()
     for n in pop_gridNodes:
         n.calculateEnergyBalance(timestep_h)
-
+    # print(
+    #     "Time spent on gridNodes in one timestep: "
+    #     + str(time.time() - t0gN)
+    #     + " seconds"
+    # )
     ## Financial transactions
 
     ## timestep print

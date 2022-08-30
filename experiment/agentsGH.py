@@ -68,6 +68,7 @@ class GridConnection:
         parentNodeElectricID,
         parentNodeHeatID,
         OL_ConnectionCategory,
+        ownerID,
     ):
         # is called automatically when a new agent is created
         self.v_currentLoadElectricity_kW = 0
@@ -81,8 +82,9 @@ class GridConnection:
         self.EA_HeatingSystem = []
         self.EA_EV = []
         self.EA_ThermalStorage = []
+        self.ownerID = ownerID
 
-    def connectToParents(self, pop_gridNodes):
+    def connectToParents(self, pop_gridNodes, pop_connectionOwners):
         # for x in pop_gridNodes:
         #     if x.nodeID == self.parentNodeElectricID:
         x = [x for x in pop_gridNodes if x.nodeID == self.parentNodeElectricID]
@@ -95,6 +97,12 @@ class GridConnection:
         if bool(x):
             x = x[0]
             self.parentNodeHeat = x
+            x.connectToChild(self)
+
+        x = [x for x in pop_connectionOwners if x.ID == self.ownerID]
+        if bool(x):
+            x = x[0]
+            self.parentOwner = x
             x.connectToChild(self)
 
     # print('Connected gridConnection to electric parent node!')
@@ -208,18 +216,63 @@ class GridConnection:
 
 
 class ConnectionOwner:
-    def __init__(self, ownerID):
+    def __init__(self, ownerID, parentActorID, type):
         self.ID = ownerID
+        self.ownedConnections = []
+        self.parentActorID = parentActorID
+        self.type = type
+
+    def connectToParents(self, pop_energyHolons, pop_energySuppliers):
+        # for x in pop_gridNodes:
+        #     if x.nodeID == self.parentNodeElectricID:
+        x = [x for x in pop_energyHolons if x.ID == self.parentActorID]
+        if bool(x):
+            x = x[0]
+            self.energyHolon = x
+            x.connectToChild(self)
+
+        x = [x for x in pop_energySuppliers if x.ID == self.parentActorID]
+        if bool(x):
+            x = x[0]
+            self.energySupplier = x
+            x.connectToChild(self)
+
+    # print('Connected gridConnection to electric parent node!')
+    # if x.nodeID == self.parentNodeHeatID:
+
+    # print('Connected gridConnection to heating parent node!')
+
+    def connectToChild(self, gridConnection: GridConnection):
+        self.ownedConnections.append(gridConnection)
 
 
 class EnergyHolon:
-    def __init__(self, holonID):
+    def __init__(self, holonID, parentActorID):
         self.ID = holonID
+        self.members = []
+        self.energySupplier = None
+        self.parentActorID = parentActorID
+
+    def connectToChild(self, connectionOwner: ConnectionOwner):
+        self.members.append(connectionOwner)
+
+    def connectToParents(self, pop_energySuppliers):
+        x = [x for x in pop_energySuppliers if x.ID == self.parentActorID]
+        if bool(x):
+            x = x[0]
+            self.energySupplier = x
+            x.connectToChild(self)
+        else:
+            print("HOLON wants to connect to non-existent energy-supplier!")
 
 
 class EnergySupplier:
     def __init__(self, supplierID):
         self.ID = supplierID
+        self.customers = []
+
+    def connectToChild(self, connectionOwner: ConnectionOwner):
+        self.customers.append(connectionOwner)
 
 
 class GridOperator:
