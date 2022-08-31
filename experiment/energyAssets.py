@@ -1,5 +1,7 @@
 from cmath import isnan
 from types import NoneType
+
+## ENUMs (OptionLists)
 from enum import Enum
 
 
@@ -8,6 +10,14 @@ class OL_EnergyCarrier(Enum):
     HEAT = 2
     METHANE = 3
     HYDROGEN = 4
+
+
+class OL_EnergyContract(Enum):
+    ELECTRICITYFIXED = 1
+    ELECTRICITYVARIABLE = 2
+    HEATFIXED = 3
+    METHANEFIXED = 4
+    HYDROGENFIXED = 5
 
 
 class EnergyAsset:

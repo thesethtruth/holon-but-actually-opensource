@@ -3,7 +3,15 @@ import pandas as pd
 from agentsGH import *
 from energyAssets import *
 import time
+from joblib import Parallel, delayed
 
+
+def gridConnectionPowerflows(c: GridConnection, t, timestep_h, df_currentprofiles):
+    c.manageAssets(t, timestep_h, df_currentprofiles)
+    c.calculateEnergyBalance(timestep_h)
+
+
+parallelize = 1
 
 t1 = time.time()
 ##############
@@ -69,6 +77,7 @@ for idx in df_gridConnections.index.array:
             df_gridConnections.parent_electric.array[idx],
             df_gridConnections.parent_heat.array[idx],
             df_gridConnections.type.array[idx],
+            df_gridConnections.owner_actor.array[idx],
         )
     )
 
@@ -141,8 +150,10 @@ for idx in df_actors.index.array:
         pop_energySuppliers.append(EnergySupplier(df_actors.id.array[idx]))
 
     if df_actors.agenttype.array[idx] == "ENERGYHOLON":
-        pop_energyHolons.append(EnergyHolon(df_actors.id.array[idx],df_actors.id.parent_actor[idx]))
-    
+        pop_energyHolons.append(
+            EnergyHolon(df_actors.id.array[idx], df_actors.parent_actor.array[idx])
+        )
+
     if df_actors.agenttype.array[idx] == "GRIDOPERATOR":
         pop_gridOperators.append(GridOperator(df_actors.id.array[idx]))
 
@@ -152,14 +163,21 @@ for e in pop_energyAssets:
 
 # Make links between gridConnections and gridNodes
 for c in pop_gridConnections:
-    c.connectToParents(pop_gridNodes)
+    c.connectToParents(pop_gridNodes, pop_connectionOwners)
     # print(x.parentNode.nodeID)
 
+# Make links between gridConnections and connectionOwners
+for o in pop_connectionOwners:
+    o.connectToParents(pop_energyHolons, pop_energySuppliers)
+
+# Make links between energyHolons and energySuppliers
+for h in pop_energyHolons:
+    h.connectToParents(pop_energySuppliers)
 
 ##############################################
 ## Simulate! Loop over timesteps
 for t in np.arange(
-    0, 24 * 7 * 52, timestep_h
+    0, 24, timestep_h
 ):  ## Just 10 steps for now, for testing. Will be 8760 later of course.
     ## Update profiles
     df_currentprofiles = df_profiles.loc[[round(t)]]
@@ -167,10 +185,19 @@ for t in np.arange(
     ## Propagate incentives
 
     ## Propagate powerflows
-    # t0gC = time.time()
-    for c in pop_gridConnections:
-        c.manageAssets(t, timestep_h, df_currentprofiles)
-        c.calculateEnergyBalance(timestep_h)
+    t0gc = time.time()
+    if parallelize:
+        Parallel(n_jobs=2)(
+            delayed(gridConnectionPowerflows)(c, t, timestep_h, df_currentprofiles)
+            for c in pop_gridConnections
+        )
+    else:
+        for c in pop_gridConnections:
+            c.manageAssets(t, timestep_h, df_currentprofiles)
+            c.calculateEnergyBalance(timestep_h)
+    t1gc = time.time()
+    print("Time spent on grid connections in single timestep: " + str(t1gc - t0gc))
+
     # print(
     #     "Time spent on gridConnections in one timestep: "
     #     + str(time.time() - t0gC)
