@@ -245,6 +245,7 @@ class EA_GasBurner(EA_Conversion):
         self.v_currentConsumptionMethane_kW = (
             self.v_currentProductionHeat_kW / self.eta_r
         )
+        # print("Gas burner power fraction " + str(self.v_powerFraction_fr) + ", methane consumption " + str(self.v_currentConsumptionMethane_kW) + " kWh")
         self.energyUsed_kWh += timestep_h * (
             self.v_currentConsumptionMethane_kW - self.v_currentProductionHeat_kW
         )  # This represents losses!
