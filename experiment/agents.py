@@ -216,6 +216,25 @@ class GridConnection:
             if e.energyAssetType == "PHOTOVOLTAIC":
                 e.setPowerFraction(df_profiles.solar_e_prod_normalized.array[0])
                 e.runAsset()
+            if e.energyAssetType == "House_other_electricity":
+                e.setPowerFraction(df_profiles.hh_e_demand_other.array[0])
+                e.runAsset()
+                # print(
+                #     "HH other electricity demand "
+                #     + str(e.v_powerFraction_fr * e.capacity_kW)
+                #     + "kW"
+                # )
+            if e.energyAssetType == "House_hot_water":
+                e.setPowerFraction(df_profiles.hh_DHW_demand.array[0])
+                e.runAsset()
+            if e.energyAssetType == "PHOTOVOLTAIC":
+                e.setPowerFraction(df_profiles.solar_e_prod_normalized.array[0])
+                e.runAsset()
+                # print(
+                #     "PV production household "
+                #     + str(e.v_powerFraction_fr * e.capacity_kW)
+                #     + "kW"
+                # )
 
         if bool(self.EA_EV):
             # print(
@@ -281,15 +300,15 @@ class GridConnection:
                     )
                     * heatTransferToNetworkCoefficient_kWpK
                 )
-                print(
-                    "District heating system is delivering "
-                    + str(heatTransferToNetwork_kW)
-                    + " kW heat to network. Storage temp is "
-                    + str(storageTemp_degC)
-                    + "degC, network temp is "
-                    + str(self.parentNodeHeat.transportBuffer.getStorageTemp())
-                    + " degC"
-                )
+                # print(
+                #     "District heating system is delivering "
+                #     + str(heatTransferToNetwork_kW)
+                #     + " kW heat to network. Storage temp is "
+                #     + str(storageTemp_degC)
+                #     + "degC, network temp is "
+                #     + str(self.parentNodeHeat.transportBuffer.getStorageTemp())
+                #     + " degC"
+                # )
                 self.EA_ThermalStorage.updateAmbientTemperature(
                     df_profiles.ambientTemperature_degC.array[0]
                 )

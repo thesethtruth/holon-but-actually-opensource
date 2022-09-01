@@ -68,7 +68,6 @@ for idx in df_gridNodes.index:
     )
     if df_gridNodes.type[idx] == "HEAT":
         pop_gridNodes[idx].transportBuffer = EA_StorageHeat(
-            99,
             None,
             "Thermal Storage",
             1000,
@@ -111,16 +110,42 @@ for idx in df_gridConnections.index.array:
 
     # Initialize default assets?
     if df_gridConnections.type.array[idx] == "HOUSE":
+        # add house appliances consumption asset
+        pop_energyAssets.append(
+            EA_Consumption(
+                df_gridConnections.id.array[idx],
+                "House_other_electricity",
+                2,
+                OL_EnergyCarrier.ELECTRICITY,
+            )
+        )
+        # Add DHW consumption asset
+        pop_energyAssets.append(
+            EA_Consumption(
+                df_gridConnections.id.array[idx],
+                "House_hot_water",
+                10,
+                OL_EnergyCarrier.HEAT,
+            )
+        )
+        # add solar panels
+        pop_energyAssets.append(
+            EA_Production(
+                df_gridConnections.id.array[idx],
+                "PHOTOVOLTAIC",
+                3,
+                OL_EnergyCarrier.ELECTRICITY,
+            )
+        )
         # add EV
         pop_energyAssets.append(
-            EA_EV(99, df_gridConnections.id.array[idx], "EV", 100, 0.2, 0.5, 60)
+            EA_EV(df_gridConnections.id.array[idx], "EV", 100, 0.2, 0.5, 80)
         )
         pop_gridConnections[idx].loadCarRides(tripsarray)
 
         # add thermal storage (ie. building thermal model)
         pop_energyAssets.append(
             EA_StorageHeat(
-                99,
                 df_gridConnections.id.array[idx],
                 "Thermal Storage",
                 100,
@@ -138,7 +163,6 @@ for idx in df_gridConnections.index.array:
             # )
             pop_energyAssets.append(
                 EA_GasBurner(
-                    99,
                     df_gridConnections.id.array[idx],
                     "Gas Burner",
                     30,
@@ -148,7 +172,6 @@ for idx in df_gridConnections.index.array:
         else:
             pop_energyAssets.append(
                 EA_HeatDeliverySet(
-                    99,
                     df_gridConnections.id.array[idx],
                     "Delivery Set",
                     10,
@@ -163,7 +186,6 @@ for idx in df_gridConnections.index.array:
         # add thermal storage (ie. thermal storage for central heating)
         pop_energyAssets.append(
             EA_StorageHeat(
-                99,
                 df_gridConnections.id.array[idx],
                 "Thermal Storage",
                 1000,
@@ -177,7 +199,6 @@ for idx in df_gridConnections.index.array:
 
         pop_energyAssets.append(
             EA_GasBurner(
-                99,
                 df_gridConnections.id.array[idx],
                 "Gas Burner",
                 300,
@@ -189,19 +210,21 @@ for idx in df_energyAssets.index.array:
     if df_energyAssets.type.array[idx] == "PRODUCTION":
         pop_energyAssets.append(
             EA_Production(
-                df_energyAssets.id.array[idx],
+                # df_energyAssets.id.array[idx],
                 df_energyAssets.parent.array[idx],
                 df_energyAssets.type2.array[idx],
                 df_energyAssets.capacity_electric_kw.array[idx],
+                OL_EnergyCarrier.ELECTRICITY,
             )
         )
     if df_energyAssets.type.array[idx] == "CONSUMPTION":
         pop_energyAssets.append(
             EA_Consumption(
-                df_energyAssets.id.array[idx],
+                # df_energyAssets.id.array[idx],
                 df_energyAssets.parent.array[idx],
                 df_energyAssets.type2.array[idx],
                 df_energyAssets.capacity_electric_kw.array[idx],
+                OL_EnergyCarrier.ELECTRICITY,
             )
         )
 
@@ -245,17 +268,19 @@ for o in pop_connectionOwners:
 for h in pop_energyHolons:
     h.connectToParents(pop_energySuppliers)
 
+df_profilecolumns = df_profiles.columns
 ##############################################
 ## Simulate! Loop over timesteps
 for t in np.arange(
     0, 24 * 7, timestep_h
 ):  ## Just 10 steps for now, for testing. Will be 8760 later of course.
     ## Update profiles
-    df_currentprofiles = df_profiles.loc[[round(t)]]
+    # df_currentprofiles = df_profiles.loc[[round(t)]]
+    df_currentvalues = df_profiles.values[t, :]
 
     ## Propagate incentives
     nationalMarket.updateNationalElectricityPrice(
-        df_profiles.Day_ahead_Price_EURpMWh.array[0]
+        df_currentprofiles.Day_ahead_Price_EURpMWh.array[0]
     )
     for e in pop_energySuppliers:
         e.updateEnergyPrice(nationalMarket)
