@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from agentsGH import *
+from agents import *
 from energyAssets import *
 import time
 
@@ -205,11 +205,22 @@ print("Elapsed time " + str(t2 - t1))
 
 print(
     "Total imported electricity in model "
-    + str([x.totalImportedEnergy_kWh for x in pop_gridNodes if x.nodeID == "E1"])
+    + str([x.v_electricityDelivered_kWh for x in pop_gridNodes if x.nodeID == "E1"])
     + " kWh"
 )
 print(
     "Total exported electricity in model "
-    + str([x.totalExportedEnergy_kWh for x in pop_gridNodes if x.nodeID == "E1"])
+    + str([x.v_electricityDrawn_kWh for x in pop_gridNodes if x.nodeID == "E1"])
+    + " kWh"
+)
+
+print(
+    "Total imported heat in model "
+    + str([x.v_heatDelivered_kWh for x in pop_gridNodes if x.energyCarrier == "HEAT"])
+    + " kWh"
+)
+print(
+    "Total exported heat in model "
+    + str([x.v_heatDrawn_kWh for x in pop_gridNodes if x.energyCarrier == "HEAT"])
     + " kWh"
 )

@@ -10,13 +10,16 @@
 #     def agent_method(self):
 #         # Define custom actions here
 #         pass
+#from fcntl import F_FULLFSYNC
 from genericpath import exists
 import random
+from typing import List
 import numpy as np
 from energyAssets import *
 
 
 class GridNode:
+
     def __init__(
         self, nodeID, energyCarrier, capacity_kW, OL_netNodeType, parentNodeID
     ):
@@ -33,6 +36,21 @@ class GridNode:
         self.childConnections = []
         self.totalImportedEnergy_kWh = 0
         self.totalExportedEnergy_kWh = 0
+        self.transportBuffer = ''
+        self.v_electricityDrawn_kWh = 0
+        self.v_methaneDrawn_kWh = 0
+        self.v_hydrogenDrawn_kWh = 0
+        self.v_heatDrawn_kWh = 0
+        self.v_electricityDelivered_kWh = 0
+        self.v_methaneDelivered_kWh = 0
+        self.v_hydrogenDelivered_kWh = 0
+        self.v_heatDelivered_kWh = 0
+        self.c_electricityFlows = []
+        self.c_methaneFlows = []
+        self.c_hydrogenFlows = []
+        self.c_heatFlows = []
+
+
 
     def connectToParent(self, pop_gridNodes):
         x = [x for x in pop_gridNodes if x.nodeID == self.parentNodeID]
@@ -49,17 +67,64 @@ class GridNode:
         self.childConnections.append(childNode)
 
     def calculateEnergyBalance(self, timestep_h):
+        self.c_electricityFlows.clear()
+        self.c_methaneFlows.clear()
+        self.c_hydrogenFlows.clear()
+        self.c_heatFlows.clear()
+        
         self.v_currentLoadElectricity_kW = 0
+        self.v_currentLoadHeat_kW = 0
+        self.v_currentLoadMethane_kW = 0
+        self.v_currentLoadHydrogen_kW = 0
+        #print("node reset!")
+
         for c in self.childConnections:
-            self.v_currentLoadElectricity_kW += c.v_currentLoadElectricity_kW
-        self.totalImportedEnergy_kWh += max(
-            0, self.v_currentLoadElectricity_kW * timestep_h
-        )
-        self.totalExportedEnergy_kWh -= min(
-            0, self.v_currentLoadElectricity_kW * timestep_h
-        )
+            #print("node ",self.nodeID, "energytype: ", self.energyCarrier, ", subconnection capacity: ", c.capacity_kW)
+            if self.energyCarrier == "ELECTRICITY":
+                #print("electricity node or connection!")
+                currentLoad_kW = c.v_currentLoadElectricity_kW
+                currentEnergy_kWh = c.v_currentLoadElectricity_kW * timestep_h
+                self.v_currentLoadElectricity_kW += currentLoad_kW
+                self.c_electricityFlows.append(currentLoad_kW)
+                self.v_electricityDelivered_kWh += max(0, currentEnergy_kWh)
+                self.v_electricityDrawn_kWh -=  min(0, currentEnergy_kWh)
+                self.totalImportedEnergy_kWh += max(0, currentEnergy_kWh)
+                self.totalExportedEnergy_kWh -= min(0, currentEnergy_kWh)
+            elif self.energyCarrier == "HEAT":                    
+                #print("heat node or connection!")
+                currentLoad_kW = c.v_currentLoadHeat_kW
+                currentEnergy_kWh = c.v_currentLoadHeat_kW * timestep_h
+                self.v_currentLoadHeat_kW += currentLoad_kW
+                self.c_heatFlows.append(currentLoad_kW)
+                self.v_heatDelivered_kWh += max(0, currentEnergy_kWh)
+                self.v_heatDrawn_kWh -=  min(0, currentEnergy_kWh)  
+                self.totalImportedEnergy_kWh += max(0, currentEnergy_kWh)
+                self.totalExportedEnergy_kWh -= min(0, currentEnergy_kWh)
+            elif self.energyCarrier == "METHANE":                    
+                #print("methane node or connection!")
+                currentLoad_kW = c.v_currentLoadMethane_kW
+                currentEnergy_kWh = c.v_currentLoadMethane_kW * timestep_h
+                self.v_currentLoadHeat_kW += currentLoad_kW
+                self.c_methaneFlows.append(currentLoad_kW)
+                self.v_methaneDelivered_kWh += max(0, currentEnergy_kWh)
+                self.v_methaneDrawn_kWh -=  min(0, currentEnergy_kWh)  
+                self.totalImportedEnergy_kWh += max(0, currentEnergy_kWh)
+                self.totalExportedEnergy_kWh -= min(0, currentEnergy_kWh)
+            elif self.energyCarrier == "HYDROGEN":                    
+                #print("hydrogen node or connection!")
+                currentLoad_kW = c.v_currentLoadHydrogen_kW
+                currentEnergy_kWh = c.v_currentLoadHydrogen_kW * timestep_h
+                self.v_currentLoadHydrogen_kW += currentLoad_kW
+                self.c_hydrogenFlows.append(currentLoad_kW)
+                self.v_hydrogenDelivered_kWh += max(0, currentEnergy_kWh)
+                self.v_hydrogenDrawn_kWh -=  min(0, currentEnergy_kWh)  
+                self.totalImportedEnergy_kWh += max(0, currentEnergy_kWh)
+                self.totalExportedEnergy_kWh -= min(0, currentEnergy_kWh)                  
+
         # if self.nodeID == 'E1':
         #     print("Current HS grid load is " + str(self.v_currentLoadElectricity_kW) + ' kW, total imported electricity ' + str(self.totalImportedEnergy_kWh) + ' kWh, timestep ' +str(timestep_h))
+
+
 
 
 class GridConnection:
