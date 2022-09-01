@@ -10,7 +10,7 @@
 #     def agent_method(self):
 #         # Define custom actions here
 #         pass
-#from fcntl import F_FULLFSYNC
+# from fcntl import F_FULLFSYNC
 from genericpath import exists
 import random
 from typing import List
@@ -19,7 +19,6 @@ from energyAssets import *
 
 
 class GridNode:
-
     def __init__(
         self, nodeID, energyCarrier, capacity_kW, OL_netNodeType, parentNodeID
     ):
@@ -36,7 +35,7 @@ class GridNode:
         self.childConnections = []
         self.totalImportedEnergy_kWh = 0
         self.totalExportedEnergy_kWh = 0
-        self.transportBuffer = ''
+        self.transportBuffer = None
         self.v_electricityDrawn_kWh = 0
         self.v_methaneDrawn_kWh = 0
         self.v_hydrogenDrawn_kWh = 0
@@ -49,8 +48,6 @@ class GridNode:
         self.c_methaneFlows = []
         self.c_hydrogenFlows = []
         self.c_heatFlows = []
-
-
 
     def connectToParent(self, pop_gridNodes):
         x = [x for x in pop_gridNodes if x.nodeID == self.parentNodeID]
@@ -71,60 +68,64 @@ class GridNode:
         self.c_methaneFlows.clear()
         self.c_hydrogenFlows.clear()
         self.c_heatFlows.clear()
-        
+
         self.v_currentLoadElectricity_kW = 0
         self.v_currentLoadHeat_kW = 0
         self.v_currentLoadMethane_kW = 0
         self.v_currentLoadHydrogen_kW = 0
-        #print("node reset!")
+        # print("node reset!")
 
         for c in self.childConnections:
-            #print("node ",self.nodeID, "energytype: ", self.energyCarrier, ", subconnection capacity: ", c.capacity_kW)
+            # print("node ",self.nodeID, "energytype: ", self.energyCarrier, ", subconnection capacity: ", c.capacity_kW)
             if self.energyCarrier == "ELECTRICITY":
-                #print("electricity node or connection!")
+                # print("electricity node or connection!")
                 currentLoad_kW = c.v_currentLoadElectricity_kW
                 currentEnergy_kWh = c.v_currentLoadElectricity_kW * timestep_h
                 self.v_currentLoadElectricity_kW += currentLoad_kW
                 self.c_electricityFlows.append(currentLoad_kW)
                 self.v_electricityDelivered_kWh += max(0, currentEnergy_kWh)
-                self.v_electricityDrawn_kWh -=  min(0, currentEnergy_kWh)
+                self.v_electricityDrawn_kWh -= min(0, currentEnergy_kWh)
                 self.totalImportedEnergy_kWh += max(0, currentEnergy_kWh)
                 self.totalExportedEnergy_kWh -= min(0, currentEnergy_kWh)
-            elif self.energyCarrier == "HEAT":                    
-                #print("heat node or connection!")
+            elif self.energyCarrier == "HEAT":
+                # print("heat node or connection!")
                 currentLoad_kW = c.v_currentLoadHeat_kW
                 currentEnergy_kWh = c.v_currentLoadHeat_kW * timestep_h
                 self.v_currentLoadHeat_kW += currentLoad_kW
                 self.c_heatFlows.append(currentLoad_kW)
                 self.v_heatDelivered_kWh += max(0, currentEnergy_kWh)
-                self.v_heatDrawn_kWh -=  min(0, currentEnergy_kWh)  
+                self.v_heatDrawn_kWh -= min(0, currentEnergy_kWh)
                 self.totalImportedEnergy_kWh += max(0, currentEnergy_kWh)
                 self.totalExportedEnergy_kWh -= min(0, currentEnergy_kWh)
-            elif self.energyCarrier == "METHANE":                    
-                #print("methane node or connection!")
+
+                v_powerfraction_fr = (
+                    -self.v_currentLoadHeat_kW / self.transportBuffer.capacity_kW
+                )
+                self.transportBuffer.setPowerFraction(v_powerfraction_fr)
+                self.transportBuffer.runAsset(timestep_h)
+            elif self.energyCarrier == "METHANE":
+                # print("methane node or connection!")
                 currentLoad_kW = c.v_currentLoadMethane_kW
                 currentEnergy_kWh = c.v_currentLoadMethane_kW * timestep_h
                 self.v_currentLoadHeat_kW += currentLoad_kW
                 self.c_methaneFlows.append(currentLoad_kW)
                 self.v_methaneDelivered_kWh += max(0, currentEnergy_kWh)
-                self.v_methaneDrawn_kWh -=  min(0, currentEnergy_kWh)  
+                self.v_methaneDrawn_kWh -= min(0, currentEnergy_kWh)
                 self.totalImportedEnergy_kWh += max(0, currentEnergy_kWh)
                 self.totalExportedEnergy_kWh -= min(0, currentEnergy_kWh)
-            elif self.energyCarrier == "HYDROGEN":                    
-                #print("hydrogen node or connection!")
+            elif self.energyCarrier == "HYDROGEN":
+                # print("hydrogen node or connection!")
                 currentLoad_kW = c.v_currentLoadHydrogen_kW
                 currentEnergy_kWh = c.v_currentLoadHydrogen_kW * timestep_h
                 self.v_currentLoadHydrogen_kW += currentLoad_kW
                 self.c_hydrogenFlows.append(currentLoad_kW)
                 self.v_hydrogenDelivered_kWh += max(0, currentEnergy_kWh)
-                self.v_hydrogenDrawn_kWh -=  min(0, currentEnergy_kWh)  
+                self.v_hydrogenDrawn_kWh -= min(0, currentEnergy_kWh)
                 self.totalImportedEnergy_kWh += max(0, currentEnergy_kWh)
-                self.totalExportedEnergy_kWh -= min(0, currentEnergy_kWh)                  
+                self.totalExportedEnergy_kWh -= min(0, currentEnergy_kWh)
 
         # if self.nodeID == 'E1':
         #     print("Current HS grid load is " + str(self.v_currentLoadElectricity_kW) + ' kW, total imported electricity ' + str(self.totalImportedEnergy_kWh) + ' kWh, timestep ' +str(timestep_h))
-
-
 
 
 class GridConnection:
@@ -142,6 +143,14 @@ class GridConnection:
         self.v_currentLoadHeat_kW = 0
         self.v_currentLoadMethane_kW = 0
         self.v_currentLoadHydrogen_kW = 0
+        self.v_electricityDrawn_kWh = 0
+        self.v_methaneDrawn_kWh = 0
+        self.v_hydrogenDrawn_kWh = 0
+        self.v_heatDrawn_kWh = 0
+        self.v_electricityDelivered_kWh = 0
+        self.v_methaneDelivered_kWh = 0
+        self.v_hydrogenDelivered_kWh = 0
+        self.v_heatDelivered_kWh = 0
         self.connectionID = connectionID
         self.capacity_kW = capacity_kW
         # self.energyCarrier = energyCarrier
@@ -181,15 +190,16 @@ class GridConnection:
     # print('Connected gridConnection to heating parent node!')
 
     def connectToChild(self, connectedAsset: EnergyAsset):
-
+        self.connectedAssets.append(connectedAsset)
         if connectedAsset.energyAssetType == "EV":
             self.EA_EV = connectedAsset
-        elif connectedAsset.energyAssetType == "Gas Burner":
+        elif (
+            connectedAsset.energyAssetType == "Gas Burner"
+            or connectedAsset.energyAssetType == "Delivery Set"
+        ):
             self.EA_HeatingSystem = connectedAsset
         elif connectedAsset.energyAssetType == "Thermal Storage":
             self.EA_ThermalStorage = connectedAsset
-        else:
-            self.connectedAssets.append(connectedAsset)
 
     def manageAssets(self, t, timestep_h, df_profiles):
         # print("Managing EnergyAssets")
@@ -219,46 +229,128 @@ class GridConnection:
             self.EA_EV.setPowerFraction(self.capacity_kW / self.EA_EV.capacity_kW)
             self.EA_EV.runAsset(timestep_h)
         if bool(self.EA_HeatingSystem) and bool(self.EA_ThermalStorage):
-            tempSetpoint_degC = 20
-            houseTemp_degC = self.EA_ThermalStorage.storageTemp_degC
-            self.EA_ThermalStorage.updateAmbientTemperature(
-                df_profiles.ambientTemperature_degC.array[0]
-            )
-            if houseTemp_degC < tempSetpoint_degC:
-                # //traceln("heatCapacity heatingSystem " + p_spaceHeatingAsset.p_energyAssetInstance.getHeatCapacity_kW());
-                powerDemand_kW = (
-                    (tempSetpoint_degC - houseTemp_degC)
-                    * (self.EA_ThermalStorage.heatCapacity_JpK)
-                    / 3.6e6
+            if self.OL_gridConnectionCategory == "HOUSE":
+                tempSetpoint_degC = 20
+                houseTemp_degC = self.EA_ThermalStorage.storageTemp_degC
+                self.EA_ThermalStorage.updateAmbientTemperature(
+                    df_profiles.ambientTemperature_degC.array[0]
                 )
-                self.EA_HeatingSystem.setPowerFraction(
-                    powerDemand_kW / self.EA_HeatingSystem.capacity_kW
+                if houseTemp_degC < tempSetpoint_degC:
+                    # //traceln("heatCapacity heatingSystem " + p_spaceHeatingAsset.p_energyAssetInstance.getHeatCapacity_kW());
+                    powerDemand_kW = (
+                        (tempSetpoint_degC - houseTemp_degC)
+                        * (self.EA_ThermalStorage.heatCapacity_JpK)
+                        / 3.6e6
+                    )
+                    self.EA_HeatingSystem.setPowerFraction(
+                        powerDemand_kW / self.EA_HeatingSystem.capacity_kW
+                    )
+                    self.EA_ThermalStorage.setPowerFraction(
+                        powerDemand_kW / self.EA_ThermalStorage.capacity_kW
+                    )
+                    # //traceln("Power fraction heating " + p_spaceHeatingAsset.v_powerFraction_fr);
+                else:
+                    self.EA_HeatingSystem.setPowerFraction(0)
+                    self.EA_ThermalStorage.setPowerFraction(0)
+                self.EA_HeatingSystem.runAsset(timestep_h)
+                self.EA_ThermalStorage.runAsset(timestep_h)
+                # if self.EA_HeatingSystem.energyAssetType == "Delivery Set":
+                #     print(
+                #         "house temp in house "
+                #         + self.connectionID
+                #         + " is "
+                #         + str(houseTemp_degC)
+                #         + ", heating system power fraction is "
+                #         + str(self.EA_HeatingSystem.v_powerFraction_fr)
+                #     )
+            elif self.OL_gridConnectionCategory == "DISTRICTHEATING":
+                tempSetpoint_degC = 70
+                heatTransferToNetworkCoefficient_kWpK = 10
+                storageTemp_degC = self.EA_ThermalStorage.storageTemp_degC
+                heatTransferToNetwork_kW = (
+                    max(
+                        min(storageTemp_degC, tempSetpoint_degC)
+                        - self.parentNodeHeat.transportBuffer.getStorageTemp(),
+                        0,
+                    )
+                    * heatTransferToNetworkCoefficient_kWpK
                 )
-                self.EA_ThermalStorage.setPowerFraction(
-                    powerDemand_kW / self.EA_ThermalStorage.capacity_kW
+                print(
+                    "District heating system is delivering "
+                    + str(heatTransferToNetwork_kW)
+                    + " kW heat to network. Storage temp is "
+                    + str(storageTemp_degC)
+                    + "degC, network temp is "
+                    + str(self.parentNodeHeat.transportBuffer.getStorageTemp())
+                    + " degC"
                 )
-                # //traceln("Power fraction heating " + p_spaceHeatingAsset.v_powerFraction_fr);
-            else:
-                self.EA_HeatingSystem.setPowerFraction(0)
-                self.EA_ThermalStorage.setPowerFraction(0)
-            self.EA_HeatingSystem.runAsset(timestep_h)
-            self.EA_ThermalStorage.runAsset(timestep_h)
-            # print(
-            #     "house temp in house "
-            #     + self.connectionID
-            #     + " is "
-            #     + str(houseTemp_degC)
-            #     + ", heating system power fraction is "
-            #     + str(self.EA_HeatingSystem.v_powerFraction_fr)
-            # )
+                self.EA_ThermalStorage.updateAmbientTemperature(
+                    df_profiles.ambientTemperature_degC.array[0]
+                )
+                if storageTemp_degC < tempSetpoint_degC:
+                    # //traceln("heatCapacity heatingSystem " + p_spaceHeatingAsset.p_energyAssetInstance.getHeatCapacity_kW());
+                    powerDemand_kW = self.EA_HeatingSystem.capacity_kW
+                    self.EA_HeatingSystem.setPowerFraction(
+                        powerDemand_kW / self.EA_HeatingSystem.capacity_kW
+                    )
+                    self.EA_ThermalStorage.setPowerFraction(
+                        (powerDemand_kW - heatTransferToNetwork_kW)
+                        / self.EA_ThermalStorage.capacity_kW
+                    )
+                    # //traceln("Power fraction heating " + p_spaceHeatingAsset.v_powerFraction_fr);
+                else:
+                    self.EA_HeatingSystem.setPowerFraction(0)
+                    self.EA_ThermalStorage.setPowerFraction(
+                        -heatTransferToNetwork_kW / self.EA_ThermalStorage.capacity_kW
+                    )
+                self.EA_HeatingSystem.runAsset(timestep_h)
+                self.EA_ThermalStorage.runAsset(timestep_h)
 
     def calculateEnergyBalance(self, timestep_h):
         self.v_currentLoadElectricity_kW = 0
+        self.v_currentLoadHeat_kW = 0
+        self.v_currentLoadMethane_kW = 0
+        self.v_currentLoadHydrogen_kW = 0
         for e in self.connectedAssets:
             # print("Looping over connected assets")
             self.v_currentLoadElectricity_kW += (
                 e.v_currentConsumptionElectric_kW - e.v_currentProductionElectric_kW
             )
+            self.v_currentLoadHeat_kW += (
+                e.v_currentConsumptionHeat_kW - e.v_currentProductionHeat_kW
+            )
+            self.v_currentLoadMethane_kW += (
+                e.v_currentConsumptionMethane_kW - e.v_currentProductionMethane_kW
+            )
+            self.v_currentLoadHydrogen_kW += (
+                e.v_currentConsumptionHydrogen_kW - e.v_currentProductionHydrogen_kW
+            )
+        self.v_electricityDrawn_kWh += (
+            max(0, self.v_currentLoadElectricity_kW) * timestep_h
+        )
+        self.v_electricityDelivered_kWh += (
+            -min(0, self.v_currentLoadElectricity_kW) * timestep_h
+        )
+        self.v_heatDrawn_kWh += max(0, self.v_currentLoadHeat_kW) * timestep_h
+        self.v_heatDelivered_kWh += -min(0, self.v_currentLoadHeat_kW) * timestep_h
+        self.v_methaneDrawn_kWh += max(0, self.v_currentLoadMethane_kW) * timestep_h
+        self.v_methaneDelivered_kWh += (
+            -min(0, self.v_currentLoadMethane_kW) * timestep_h
+        )
+        self.v_hydrogenDrawn_kWh += max(0, self.v_currentLoadHydrogen_kW) * timestep_h
+        self.v_hydrogenDelivered_kWh += (
+            -min(0, self.v_currentLoadHydrogen_kW) * timestep_h
+        )
+        # if abs(self.v_currentLoadHeat_kW) > 0.01:
+        #     print(
+        #         "HeatLoad of house "
+        #         + self.connectionID
+        #         + " is "
+        #         + str(self.v_currentLoadHeat_kW)
+        #         + ", heating system power fraction is "
+        #         + str(self.EA_HeatingSystem.v_powerFraction_fr)
+        #     )
+
         # if abs(self.v_currentLoadElectricity_kW) > 0:
         #     print(
         #         "Connection "

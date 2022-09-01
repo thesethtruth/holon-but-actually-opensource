@@ -1,4 +1,5 @@
 from cmath import isnan
+
 # from types import NoneType
 
 ## ENUMs (OptionLists)
@@ -227,9 +228,9 @@ class EA_GasBurner(EA_Conversion):
         type,
         capacity_kW,
         efficiency_r,
-        energyCarrierProduced: OL_EnergyCarrier,
-        energyCarrierConsumed: OL_EnergyCarrier,
     ) -> None:
+        energyCarrierProduced = OL_EnergyCarrier.HEAT
+        energyCarrierConsumed = OL_EnergyCarrier.METHANE
         super().__init__(
             AssetID,
             parentConnectionID,
@@ -247,4 +248,33 @@ class EA_GasBurner(EA_Conversion):
         )
         self.energyUsed_kWh += timestep_h * (
             self.v_currentConsumptionMethane_kW - self.v_currentProductionHeat_kW
+        )  # This represents losses!
+
+
+class EA_HeatDeliverySet(EA_Conversion):
+    def __init__(
+        self,
+        AssetID,
+        parentConnectionID,
+        type,
+        capacity_kW,
+        efficiency_r,
+    ) -> None:
+        energyCarrierProduced = OL_EnergyCarrier.HEAT
+        energyCarrierConsumed = OL_EnergyCarrier.HEAT
+        super().__init__(
+            AssetID,
+            parentConnectionID,
+            type,
+            capacity_kW,
+            efficiency_r,
+            energyCarrierProduced,
+            energyCarrierConsumed,
+        )
+
+    def runAsset(self, timestep_h):
+        self.v_currentProductionHeat_kW = self.capacity_kW * self.v_powerFraction_fr
+        self.v_currentConsumptionHeat_kW = self.v_currentProductionHeat_kW / self.eta_r
+        self.energyUsed_kWh += timestep_h * (
+            self.v_currentConsumptionHeat_kW - self.v_currentProductionHeat_kW
         )  # This represents losses!

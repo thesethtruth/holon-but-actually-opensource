@@ -44,16 +44,38 @@ pop_energySuppliers = []
 pop_gridOperators = []
 
 # Initialize gridNodes
-for idx in df_gridNodes.index.array:
+# for idx in df_gridNodes.index.array:
+#     pop_gridNodes.append(
+#         GridNode(
+#             df_gridNodes.id.array[idx],
+#             df_gridNodes.type.array[idx],
+#             df_gridNodes.capacity_kw.array[idx],
+#             df_gridNodes.type2.array[idx],
+#             df_gridNodes.parent.array[idx],
+#         )
+#     )
+
+for idx in df_gridNodes.index:
     pop_gridNodes.append(
         GridNode(
-            df_gridNodes.id.array[idx],
-            df_gridNodes.type.array[idx],
-            df_gridNodes.capacity_kw.array[idx],
-            df_gridNodes.type2.array[idx],
-            df_gridNodes.parent.array[idx],
+            df_gridNodes.id[idx],
+            df_gridNodes.type[idx],
+            df_gridNodes.capacity_kw[idx],
+            df_gridNodes.type2[idx],
+            df_gridNodes.parent[idx],
         )
     )
+    if df_gridNodes.type[idx] == "HEAT":
+        pop_gridNodes[idx].transportBuffer = EA_StorageHeat(
+            99,
+            None,
+            "Thermal Storage",
+            1000,
+            1e9,
+            100,
+            60,
+            df_params.value.array[1],
+        )
 
 # Make links between gridNodes
 for x in pop_gridNodes:
@@ -95,18 +117,59 @@ for idx in df_gridConnections.index.array:
             )
         )
         # add heating system
+        if str(df_gridConnections.parent_heat[idx]) == "nan":
+            # print(
+            #     "Adding gas burner to gridConnection "
+            #     + df_gridConnections.id.array[idx]
+            # )
+            pop_energyAssets.append(
+                EA_GasBurner(
+                    99,
+                    df_gridConnections.id.array[idx],
+                    "Gas Burner",
+                    30,
+                    0.95,
+                )
+            )
+        else:
+            pop_energyAssets.append(
+                EA_HeatDeliverySet(
+                    99,
+                    df_gridConnections.id.array[idx],
+                    "Delivery Set",
+                    10,
+                    0.99,
+                )
+            )
+            # print(
+            #     "Adding heat delivery set to gridConnection "
+            #     + df_gridConnections.id.array[idx]
+            # )
+    if df_gridConnections.type.array[idx] == "DISTRICTHEATING":
+        # add thermal storage (ie. thermal storage for central heating)
+        pop_energyAssets.append(
+            EA_StorageHeat(
+                99,
+                df_gridConnections.id.array[idx],
+                "Thermal Storage",
+                1000,
+                1e8,
+                1000,
+                60,
+                df_profiles.ambientTemperature_degC.array[0],
+            )
+        )
+        # add heating system
+
         pop_energyAssets.append(
             EA_GasBurner(
                 99,
                 df_gridConnections.id.array[idx],
                 "Gas Burner",
-                30,
+                300,
                 0.95,
-                OL_EnergyCarrier.HEAT,
-                OL_EnergyCarrier.METHANE,
             )
         )
-
 
 for idx in df_energyAssets.index.array:
     if df_energyAssets.type.array[idx] == "PRODUCTION":
@@ -169,7 +232,7 @@ for h in pop_energyHolons:
 ##############################################
 ## Simulate! Loop over timesteps
 for t in np.arange(
-    0, 24 * 7 * 52, timestep_h
+    0, 24 * 7, timestep_h
 ):  ## Just 10 steps for now, for testing. Will be 8760 later of course.
     ## Update profiles
     df_currentprofiles = df_profiles.loc[[round(t)]]
