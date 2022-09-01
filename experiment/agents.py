@@ -312,7 +312,6 @@ class GridConnection:
                 self.EA_HeatingSystem.runAsset(timestep_h)
                 self.EA_ThermalStorage.runAsset(timestep_h)
 
-
     def calculateEnergyBalance(self, timestep_h):
         self.v_currentLoadElectricity_kW = 0
         self.v_currentLoadHeat_kW = 0
@@ -533,9 +532,9 @@ class EnergySupplier:
                 transactionCostClient_eur = (
                     transactionVolume_kWh * self.fixedElectricityPrice_eurpkWh
                 )
-                transactionCostNat_eur = (
-                    transactionVolume_kWh * self.currentVariableElectricityPrice_eurpkWh
-                )
+                # transactionCostNat_eur = (
+                #     transactionVolume_kWh * self.currentVariableElectricityPrice_eurpkWh
+                # )
                 self.totalElectricityBoughtFromClients_kWh += -min(
                     0, transactionVolume_kWh
                 )
@@ -553,9 +552,9 @@ class EnergySupplier:
                     self.variableElectricityPriceOverNational_eurpkWh
                     + self.currentVariableElectricityPrice_eurpkWh
                 )
-                transactionCostNat_eur = (
-                    transactionVolume_kWh * self.currentVariableElectricityPrice_eurpkWh
-                )
+                # transactionCostNat_eur = (
+                #     transactionVolume_kWh * self.currentVariableElectricityPrice_eurpkWh
+                # )
                 self.totalElectricityBoughtFromClients_kWh += -min(
                     0, transactionVolume_kWh
                 )
@@ -583,7 +582,10 @@ class EnergySupplier:
         return transactionCostClient_eur
 
     def updateEnergyPrice(self, nat):
-        self.currentVariableElectricityPrice_eurpkWh = nat.getNationalElectricityPrice()
+        self.currentVariableElectricityPrice_eurpkWh = (
+            nat.getNationalElectricityPrice() / 1000
+        )
+        self.currentNettElectricityVolume_kWh = 0
 
     def updateFinances(self):
         self.totalElectricityBoughtFromNat_kWh += max(
