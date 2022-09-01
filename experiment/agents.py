@@ -10,10 +10,8 @@
 #     def agent_method(self):
 #         # Define custom actions here
 #         pass
-# from fcntl import F_FULLFSYNC
 from genericpath import exists
 import random
-from typing import List
 import numpy as np
 from energyAssets import *
 
@@ -162,6 +160,14 @@ class GridConnection:
         self.EA_EV = []
         self.EA_ThermalStorage = []
         self.ownerID = ownerID
+        self.electricityDrawn_kWh = 0
+        self.electricityDelivered_kWh = 0
+        self.heatDrawn_kWh = 0
+        self.heatDelivered_kWh = 0
+        self.methaneDrawn_kWh = 0
+        self.methaneDelivered_kWh = 0
+        self.hydrogenDrawn_kWh = 0
+        self.hydrogenDelivered_kWh = 0
 
     def connectToParents(self, pop_gridNodes, pop_connectionOwners):
         # for x in pop_gridNodes:
@@ -306,6 +312,7 @@ class GridConnection:
                 self.EA_HeatingSystem.runAsset(timestep_h)
                 self.EA_ThermalStorage.runAsset(timestep_h)
 
+
     def calculateEnergyBalance(self, timestep_h):
         self.v_currentLoadElectricity_kW = 0
         self.v_currentLoadHeat_kW = 0
@@ -341,16 +348,6 @@ class GridConnection:
         self.v_hydrogenDelivered_kWh += (
             -min(0, self.v_currentLoadHydrogen_kW) * timestep_h
         )
-        # if abs(self.v_currentLoadHeat_kW) > 0.01:
-        #     print(
-        #         "HeatLoad of house "
-        #         + self.connectionID
-        #         + " is "
-        #         + str(self.v_currentLoadHeat_kW)
-        #         + ", heating system power fraction is "
-        #         + str(self.EA_HeatingSystem.v_powerFraction_fr)
-        #     )
-
         # if abs(self.v_currentLoadElectricity_kW) > 0:
         #     print(
         #         "Connection "
@@ -401,6 +398,7 @@ class ConnectionOwner:
         if bool(x):
             x = x[0]
             self.energyHolon = x
+            self.energySupplier = x
             x.connectToChild(self)
 
         x = [x for x in pop_energySuppliers if x.ID == self.parentActorID]
@@ -433,6 +431,7 @@ class ConnectionOwner:
             transactionCost_eur = self.energySupplier.doEnergyTransaction(
                 v_electricityVolume_kWh, self.ElectricityContract
             )
+            # print("transactionCost_eur " + str(transactionCost_eur))
             self.balanceElectricity_eur += transactionCost_eur
             transactionCost_eur = self.energySupplier.doEnergyTransaction(
                 v_heatVolume_kWh, self.HeatContract
@@ -459,6 +458,12 @@ class EnergyHolon:
         self.members = []
         self.energySupplier = None
         self.parentActorID = parentActorID
+        self.electricityVolume_kWh = 0
+        self.heatVolume_kWh = 0
+        self.methaneVolume_kWh = 0
+        self.hydrogenVolume_kWh = 0
+        self.energyPassedThrough_kWh = 0
+        self.electricityContract = OL_EnergyContract.ELECTRICITYVARIABLE
 
     def connectToChild(self, connectionOwner: ConnectionOwner):
         self.members.append(connectionOwner)
@@ -472,19 +477,147 @@ class EnergyHolon:
         else:
             print("HOLON wants to connect to non-existent energy-supplier!")
 
+    def doEnergyTransaction(self, transactionVolume_kWh, contractType):
+        transactionCostClient_eur = self.energySupplier.doEnergyTransaction(
+            transactionVolume_kWh, contractType
+        )
+        # print(
+        #     "Energy transaction through Holon! Volume "
+        #     + str(transactionVolume_kWh)
+        #     + " kWh"
+        # )
+        self.energyPassedThrough_kWh += transactionVolume_kWh
+        return transactionCostClient_eur
+
+    def updateFinances(self):
+        pass
+
 
 class EnergySupplier:
-    def __init__(self, supplierID):
+    def __init__(
+        self,
+        supplierID,
+        fixedElectricityPrice_eurpkWh,
+        fixedHeatPrice_eurpkWh,
+        fixedMethanePrice_eurpkWh,
+        fixedHydrogenPrice_eurpkWh,
+        variableElectricityPriceOverNational_eurpkWh,
+    ):
         self.ID = supplierID
         self.customers = []
+        self.fixedElectricityPrice_eurpkWh = fixedElectricityPrice_eurpkWh
+        self.fixedHeatPrice_eurpkWh = fixedHeatPrice_eurpkWh
+        self.fixedMethanePrice_eurpkWh = fixedMethanePrice_eurpkWh
+        self.fixedHydrogenPrice_eurpkWh = fixedHydrogenPrice_eurpkWh
+        self.variableElectricityPriceOverNational_eurpkWh = (
+            variableElectricityPriceOverNational_eurpkWh
+        )
+        self.currentVariableElectricityPrice_eurpkWh = 0
+        self.currentBalanceElectricityClients_eur = 0
+        self.currentBalanceElectricityNational_eur = 0
+        self.currentBalanceHeatClients_eur = 0
+        self.currentBalanceMethaneClients_eur = 0
+        self.currentBalanceHydrogenClients_eur = 0
+        self.totalElectricityBoughtFromClients_kWh = 0
+        self.totalElectricitySoldToClients_kWh = 0
+        self.currentNettElectricityVolume_kWh = 0
+        self.totalElectricitySoldToNat_kWh = 0
+        self.totalElectricityBoughtFromNat_kWh = 0
 
     def connectToChild(self, connectionOwner: ConnectionOwner):
         self.customers.append(connectionOwner)
 
     def doEnergyTransaction(self, transactionVolume_kWh, contractType):
-        return 0
+        match contractType:
+            case OL_EnergyContract.ELECTRICITYFIXED:
+                transactionCostClient_eur = (
+                    transactionVolume_kWh * self.fixedElectricityPrice_eurpkWh
+                )
+                transactionCostNat_eur = (
+                    transactionVolume_kWh * self.currentVariableElectricityPrice_eurpkWh
+                )
+                self.totalElectricityBoughtFromClients_kWh += -min(
+                    0, transactionVolume_kWh
+                )
+                self.totalElectricitySoldToClients_kWh += max(0, transactionVolume_kWh)
+                self.currentNettElectricityVolume_kWh += transactionVolume_kWh
+                self.currentBalanceElectricityClients_eur += transactionCostClient_eur
+                # self.currentBalanceElectricityNational_eur -= transactionCostNat_eur
+                # print(
+                #     "Basic fixed rate electricity transaction, volume "
+                #     + str(transactionVolume_kWh)
+                #     + " kWh"
+                # )
+            case OL_EnergyContract.ELECTRICITYVARIABLE:
+                transactionCostClient_eur = transactionVolume_kWh * (
+                    self.variableElectricityPriceOverNational_eurpkWh
+                    + self.currentVariableElectricityPrice_eurpkWh
+                )
+                transactionCostNat_eur = (
+                    transactionVolume_kWh * self.currentVariableElectricityPrice_eurpkWh
+                )
+                self.totalElectricityBoughtFromClients_kWh += -min(
+                    0, transactionVolume_kWh
+                )
+                self.totalElectricitySoldToClients_kWh += max(0, transactionVolume_kWh)
+                self.currentNettElectricityVolume_kWh += transactionVolume_kWh
+                self.currentBalanceElectricityClients_eur += transactionCostClient_eur
+                # self.currentBalanceElectricityNational_eur -= transactionCostNat_eur
+            case OL_EnergyContract.HEATFIXED:
+                transactionCostClient_eur = (
+                    transactionVolume_kWh * self.fixedHeatPrice_eurpkWh
+                )
+                self.currentBalanceHeatClients_eur += transactionCostClient_eur
+            case OL_EnergyContract.METHANEFIXED:
+                transactionCostClient_eur = (
+                    transactionVolume_kWh * self.fixedMethanePrice_eurpkWh
+                )
+                self.currentBalanceMethaneClients_eur += transactionCostClient_eur
+            case OL_EnergyContract.HYDROGENFIXED:
+                transactionCostClient_eur = (
+                    transactionVolume_kWh * self.fixedHydrogenPrice_eurpkWh
+                )
+                self.currentBalanceHydrogenClients_eur += transactionCostClient_eur
+            case _:
+                print("Incorrect contract type!")
+        return transactionCostClient_eur
+
+    def updateEnergyPrice(self, nat):
+        self.currentVariableElectricityPrice_eurpkWh = nat.getNationalElectricityPrice()
+
+    def updateFinances(self):
+        self.totalElectricityBoughtFromNat_kWh += max(
+            0, self.currentNettElectricityVolume_kWh
+        )
+        self.totalElectricitySoldToNat_kWh -= min(
+            0, self.currentNettElectricityVolume_kWh
+        )
+        self.currentBalanceElectricityNational_eur -= (
+            self.currentNettElectricityVolume_kWh
+            * self.currentVariableElectricityPrice_eurpkWh
+        )
 
 
 class GridOperator:
     def __init__(self, operatorID):
         self.ID = operatorID
+
+
+class NationalMarket:
+    def __init__(self, currentNationalElectricityPrice_eurpkWh):
+        self.currentNationalElectricityPrice_eurpkWh = (
+            currentNationalElectricityPrice_eurpkWh
+        )
+
+    def updateNationalElectricityPrice(self, currentNationalElectricityPrice_eurpkWh):
+        self.currentNationalElectricityPrice_eurpkWh = (
+            currentNationalElectricityPrice_eurpkWh
+        )
+
+    def getNationalElectricityPrice(self):
+        return self.currentNationalElectricityPrice_eurpkWh
+
+
+def gridConnectionPowerflows(c: GridConnection, t, timestep_h, df_currentprofiles):
+    c.manageAssets(t, timestep_h, df_currentprofiles)
+    c.calculateEnergyBalance(timestep_h)

@@ -1,17 +1,13 @@
 import numpy as np
 import pandas as pd
-from agentsGH import *
+from agents import *
 from energyAssets import *
 import time
 from joblib import Parallel, delayed
 
+# import multiprocessing
 
-def gridConnectionPowerflows(c: GridConnection, t, timestep_h, df_currentprofiles):
-    c.manageAssets(t, timestep_h, df_currentprofiles)
-    c.calculateEnergyBalance(timestep_h)
-
-
-parallelize = 1
+parallelize = 0
 
 t1 = time.time()
 ##############
@@ -191,6 +187,10 @@ for t in np.arange(
             delayed(gridConnectionPowerflows)(c, t, timestep_h, df_currentprofiles)
             for c in pop_gridConnections
         )
+        # pool_obj.map(
+        #     gridConnectionPowerflows,
+        #     ([c for c in pop_gridConnections], t, timestep_h, df_currentprofiles),
+        # )
     else:
         for c in pop_gridConnections:
             c.manageAssets(t, timestep_h, df_currentprofiles)

@@ -4,7 +4,6 @@ from agents import *
 from energyAssets import *
 import time
 
-
 t1 = time.time()
 ##############
 ## Load data from excells
@@ -43,6 +42,8 @@ pop_energyHolons = []
 pop_energySuppliers = []
 pop_gridOperators = []
 
+
+nationalMarket = NationalMarket(0)
 # Initialize gridNodes
 # for idx in df_gridNodes.index.array:
 #     pop_gridNodes.append(
@@ -81,6 +82,19 @@ for idx in df_gridNodes.index:
 for x in pop_gridNodes:
     x.connectToParent(pop_gridNodes)
     # print(x.parentNode.nodeID)
+
+
+# pop_gridConnections.append([
+#         GridConnection(
+#             df_gridConnections.id.array,
+#             df_gridConnections.capacity_kw.array,
+#             df_gridConnections.parent_electric.array,
+#             df_gridConnections.parent_heat.array,
+#             df_gridConnections.type.array,
+#             df_gridConnections.owner_actor.array,
+#         )]
+#     )
+
 
 # Initialize gridConnections
 for idx in df_gridConnections.index.array:
@@ -202,7 +216,9 @@ for idx in df_actors.index.array:
             )
         )
     if df_actors.agenttype.array[idx] == "ENERGYSUPPLIER":
-        pop_energySuppliers.append(EnergySupplier(df_actors.id.array[idx]))
+        pop_energySuppliers.append(
+            EnergySupplier(df_actors.id.array[idx], 0.21, 0.1, 0.05, 0.3, 0.17)
+        )
 
     if df_actors.agenttype.array[idx] == "ENERGYHOLON":
         pop_energyHolons.append(
@@ -238,19 +254,26 @@ for t in np.arange(
     df_currentprofiles = df_profiles.loc[[round(t)]]
 
     ## Propagate incentives
+    nationalMarket.updateNationalElectricityPrice(
+        df_profiles.Day_ahead_Price_EURpMWh.array[0]
+    )
+    for e in pop_energySuppliers:
+        e.updateEnergyPrice(nationalMarket)
 
     ## Propagate powerflows
     # t0gC = time.time()
     for c in pop_gridConnections:
         c.manageAssets(t, timestep_h, df_currentprofiles)
         c.calculateEnergyBalance(timestep_h)
+
+    # [pop_gridConnections[i].manageAssets(t, timestep_h, df_currentprofiles) for i in range(len(pop_gridConnections))] # Not faster than normal loop...
+    # [pop_gridConnections[i].calculateEnergyBalance(timestep_h) for i in range(len(pop_gridConnections))] # Not faster than normal loop...
     # print(
     #     "Time spent on gridConnections in one timestep: "
     #     + str(time.time() - t0gC)
     #     + " seconds"
     # )
 
-    # t0gN = time.time()
     for n in pop_gridNodes:
         n.calculateEnergyBalance(timestep_h)
     # print(
@@ -259,6 +282,14 @@ for t in np.arange(
     #     + " seconds"
     # )
     ## Financial transactions
+    for o in pop_connectionOwners:
+        o.updateFinances(timestep_h)
+
+    for e in pop_energyHolons:
+        e.updateFinances()
+
+    for e in pop_energySuppliers:
+        e.updateFinances()
 
     ## timestep print
     # print("Timestep at t=" + str(t) + " hours")
