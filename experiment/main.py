@@ -259,6 +259,7 @@ for e in pop_energyAssets:
 for c in pop_gridConnections:
     c.connectToParents(pop_gridNodes, pop_connectionOwners)
     # print(x.parentNode.nodeID)
+    c.initPowerFlowArray()  # Prepare power-flow array
 
 # Make links between gridConnections and connectionOwners
 for o in pop_connectionOwners:

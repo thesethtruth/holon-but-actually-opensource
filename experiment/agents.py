@@ -160,14 +160,6 @@ class GridConnection:
         self.EA_EV = []
         self.EA_ThermalStorage = []
         self.ownerID = ownerID
-        self.electricityDrawn_kWh = 0
-        self.electricityDelivered_kWh = 0
-        self.heatDrawn_kWh = 0
-        self.heatDelivered_kWh = 0
-        self.methaneDrawn_kWh = 0
-        self.methaneDelivered_kWh = 0
-        self.hydrogenDrawn_kWh = 0
-        self.hydrogenDelivered_kWh = 0
 
     def connectToParents(self, pop_gridNodes, pop_connectionOwners):
         # for x in pop_gridNodes:
@@ -207,32 +199,17 @@ class GridConnection:
         elif connectedAsset.energyAssetType == "Thermal Storage":
             self.EA_ThermalStorage = connectedAsset
 
+    def initPowerFlowArray(self):
+        self.powerFlows = np.zeros(
+            [len(self.connectedAssets), 8]
+        )  # Array of powerflows for all connected energyAssets
+        if len(self.connectedAssets) == 0:
+            print(
+                "GridConnection " + str(self.connectionID) + "has no connected assets!"
+            )
+
     def manageAssets(self, t, timestep_h, currentprofiles):
         # print("Managing EnergyAssets")
-        for e in self.connectedAssets:
-            if e.energyAssetType == "WINDMILL":
-                e.setPowerFraction(currentprofiles[OL_profiles.WIND])
-                e.runAsset()
-            if e.energyAssetType == "PHOTOVOLTAIC":
-                e.setPowerFraction(currentprofiles[OL_profiles.SOLAR])
-                e.runAsset()
-            if e.energyAssetType == "House_other_electricity":
-                e.setPowerFraction(currentprofiles[OL_profiles.HOME_ELEC])
-                e.runAsset()
-                # print(
-                #     "HH other electricity demand "
-                #     + str(e.v_powerFraction_fr * e.capacity_kW)
-                #     + "kW"
-                # )
-            if e.energyAssetType == "House_hot_water":
-                e.setPowerFraction(currentprofiles[OL_profiles.DHW])
-                e.runAsset()
-                # print(
-                #     "PV production household "
-                #     + str(e.v_powerFraction_fr * e.capacity_kW)
-                #     + "kW"
-                # )
-
         if bool(self.EA_EV):
             # print(
             #     "Managing EV, next time at "
@@ -249,7 +226,7 @@ class GridConnection:
                 if self.tripNo == self.nbTrips:
                     self.tripNo = 0
             self.EA_EV.setPowerFraction(self.capacity_kW / self.EA_EV.capacity_kW)
-            self.EA_EV.runAsset(timestep_h)
+            # self.EA_EV.runAsset(timestep_h)
         if bool(self.EA_HeatingSystem) and bool(self.EA_ThermalStorage):
             if self.OL_gridConnectionCategory == "HOUSE":
                 tempSetpoint_degC = 20
@@ -274,8 +251,8 @@ class GridConnection:
                 else:
                     self.EA_HeatingSystem.setPowerFraction(0)
                     self.EA_ThermalStorage.setPowerFraction(0)
-                self.EA_HeatingSystem.runAsset(timestep_h)
-                self.EA_ThermalStorage.runAsset(timestep_h)
+                # self.EA_HeatingSystem.runAsset(timestep_h)
+                # self.EA_ThermalStorage.runAsset(timestep_h)
                 # if self.EA_HeatingSystem.energyAssetType == "Delivery Set":
                 #     print(
                 #         "house temp in house "
@@ -325,28 +302,61 @@ class GridConnection:
                     self.EA_ThermalStorage.setPowerFraction(
                         -heatTransferToNetwork_kW / self.EA_ThermalStorage.capacity_kW
                     )
-                self.EA_HeatingSystem.runAsset(timestep_h)
-                self.EA_ThermalStorage.runAsset(timestep_h)
+                # self.EA_HeatingSystem.runAsset(timestep_h)
+                # self.EA_ThermalStorage.runAsset(timestep_h)
+
+        idx = 0
+        for e in self.connectedAssets:
+            if e.energyAssetType == "WINDMILL":
+                e.setPowerFraction(currentprofiles[OL_profiles.WIND])
+                # e.runAsset()
+            if e.energyAssetType == "PHOTOVOLTAIC":
+                e.setPowerFraction(currentprofiles[OL_profiles.SOLAR])
+                # e.runAsset()
+            if e.energyAssetType == "House_other_electricity":
+                e.setPowerFraction(currentprofiles[OL_profiles.HOME_ELEC])
+                # e.runAsset()
+                # print(
+                #     "HH other electricity demand "
+                #     + str(e.v_powerFraction_fr * e.capacity_kW)
+                #     + "kW"
+                # )
+            if e.energyAssetType == "House_hot_water":
+                e.setPowerFraction(currentprofiles[OL_profiles.DHW])
+                # e.runAsset()
+                # print(
+                #     "PV production household "
+                #     + str(e.v_powerFraction_fr * e.capacity_kW)
+                #     + "kW"
+                # )
+            self.powerFlows[idx, :] = e.runAsset(timestep_h)
+            idx += 1
 
     def calculateEnergyBalance(self, timestep_h):
-        self.v_currentLoadElectricity_kW = 0
-        self.v_currentLoadHeat_kW = 0
-        self.v_currentLoadMethane_kW = 0
-        self.v_currentLoadHydrogen_kW = 0
-        for e in self.connectedAssets:
-            # print("Looping over connected assets")
-            self.v_currentLoadElectricity_kW += (
-                e.v_currentConsumptionElectric_kW - e.v_currentProductionElectric_kW
-            )
-            self.v_currentLoadHeat_kW += (
-                e.v_currentConsumptionHeat_kW - e.v_currentProductionHeat_kW
-            )
-            self.v_currentLoadMethane_kW += (
-                e.v_currentConsumptionMethane_kW - e.v_currentProductionMethane_kW
-            )
-            self.v_currentLoadHydrogen_kW += (
-                e.v_currentConsumptionHydrogen_kW - e.v_currentProductionHydrogen_kW
-            )
+        # self.v_currentLoadElectricity_kW = 0
+        # self.v_currentLoadHeat_kW = 0
+        # self.v_currentLoadMethane_kW = 0
+        # self.v_currentLoadHydrogen_kW = 0
+        # for e in self.connectedAssets:
+        #     # print("Looping over connected assets")
+        #     self.v_currentLoadElectricity_kW += (
+        #         e.v_currentConsumptionElectric_kW - e.v_currentProductionElectric_kW
+        #     )
+        #     self.v_currentLoadHeat_kW += (
+        #         e.v_currentConsumptionHeat_kW - e.v_currentProductionHeat_kW
+        #     )
+        #     self.v_currentLoadMethane_kW += (
+        #         e.v_currentConsumptionMethane_kW - e.v_currentProductionMethane_kW
+        #     )
+        #     self.v_currentLoadHydrogen_kW += (
+        #         e.v_currentConsumptionHydrogen_kW - e.v_currentProductionHydrogen_kW
+        #     )
+        totalPowerFlows = np.sum(self.powerFlows, axis=0)
+        self.v_currentLoadElectricity_kW = totalPowerFlows[0] - totalPowerFlows[4]
+        self.v_currentLoadHeat_kW = totalPowerFlows[1] - totalPowerFlows[5]
+        self.v_currentLoadMethane_kW = totalPowerFlows[2] - totalPowerFlows[6]
+        self.v_currentLoadHydrogen_kW = totalPowerFlows[3] - totalPowerFlows[7]
+
         self.v_electricityDrawn_kWh += (
             max(0, self.v_currentLoadElectricity_kW) * timestep_h
         )

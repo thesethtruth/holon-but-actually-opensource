@@ -75,7 +75,7 @@ class EA_Consumption(EnergyAsset):
         self.consumedEnergyCarrier = OL_EnergyCarrier
         super().__init__(parentConnectionID, type, capacity_kW)
 
-    def runAsset(self):
+    def runAsset(self, timestep_h):
         match self.consumedEnergyCarrier:
             case OL_EnergyCarrier.ELECTRICITY:
                 self.v_currentConsumptionElectric_kW = (
@@ -93,6 +93,16 @@ class EA_Consumption(EnergyAsset):
                 self.v_currentConsumptionHydrogen_kW = (
                     self.v_powerFraction_fr * self.capacity_kW
                 )
+        return [
+            self.v_currentConsumptionElectric_kW,
+            self.v_currentConsumptionHeat_kW,
+            self.v_currentConsumptionMethane_kW,
+            self.v_currentConsumptionHydrogen_kW,
+            self.v_currentProductionElectric_kW,
+            self.v_currentProductionHeat_kW,
+            self.v_currentProductionMethane_kW,
+            self.v_currentProductionHydrogen_kW,
+        ]
 
 
 class EA_Production(EnergyAsset):
@@ -100,7 +110,7 @@ class EA_Production(EnergyAsset):
         self.producedEnergyCarrier = OL_EnergyCarrier
         super().__init__(parentConnectionID, type, capacity_kW)
 
-    def runAsset(self):
+    def runAsset(self, timestep_h):
         match self.producedEnergyCarrier:
             case OL_EnergyCarrier.ELECTRICITY:
                 self.v_currentProductionElectric_kW = (
@@ -118,19 +128,39 @@ class EA_Production(EnergyAsset):
                 self.v_currentProductionHydrogen_kW = (
                     self.v_powerFraction_fr * self.capacity_kW
                 )
+        return [
+            self.v_currentConsumptionElectric_kW,
+            self.v_currentConsumptionHeat_kW,
+            self.v_currentConsumptionMethane_kW,
+            self.v_currentConsumptionHydrogen_kW,
+            self.v_currentProductionElectric_kW,
+            self.v_currentProductionHeat_kW,
+            self.v_currentProductionMethane_kW,
+            self.v_currentProductionHydrogen_kW,
+        ]
 
 
 class EA_StorageElectric(EnergyAsset):
     def __init__(self, parentConnectionID, type, capacity_kW) -> None:
         super().__init__(parentConnectionID, type, capacity_kW)
 
-    def runAsset(self):
+    def runAsset(self, timestep_h):
         self.v_currentConsumptionElectric_kW = max(
             0, self.v_powerFraction_fr * self.capacity_kW
         )
         self.v_currentProductionElectric_kW = -min(
             0, self.v_powerFraction_fr * self.capacity_kW
         )
+        return [
+            self.v_currentConsumptionElectric_kW,
+            self.v_currentConsumptionHeat_kW,
+            self.v_currentConsumptionMethane_kW,
+            self.v_currentConsumptionHydrogen_kW,
+            self.v_currentProductionElectric_kW,
+            self.v_currentProductionHeat_kW,
+            self.v_currentProductionMethane_kW,
+            self.v_currentProductionHydrogen_kW,
+        ]
 
 
 class EA_StorageHeat(EnergyAsset):
@@ -169,6 +199,16 @@ class EA_StorageHeat(EnergyAsset):
         self.v_currentConsumptionHeat_kW = max(
             0, self.v_powerFraction_fr * self.capacity_kW
         )
+        return [
+            self.v_currentConsumptionElectric_kW,
+            self.v_currentConsumptionHeat_kW,
+            self.v_currentConsumptionMethane_kW,
+            self.v_currentConsumptionHydrogen_kW,
+            self.v_currentProductionElectric_kW,
+            self.v_currentProductionHeat_kW,
+            self.v_currentProductionMethane_kW,
+            self.v_currentProductionHydrogen_kW,
+        ]
 
     def getStorageTemp(self):
         return self.storageTemp_degC
@@ -214,6 +254,16 @@ class EA_EV(EA_StorageElectric):
         else:
             self.v_currentProductionElectric_kW = 0
             self.v_currentConsumptionElectric_kW = 0
+        return [
+            self.v_currentConsumptionElectric_kW,
+            self.v_currentConsumptionHeat_kW,
+            self.v_currentConsumptionMethane_kW,
+            self.v_currentConsumptionHydrogen_kW,
+            self.v_currentProductionElectric_kW,
+            self.v_currentProductionHeat_kW,
+            self.v_currentProductionMethane_kW,
+            self.v_currentProductionHydrogen_kW,
+        ]
 
     def startTrip(self):
         if self.available:
@@ -286,6 +336,16 @@ class EA_GasBurner(EA_Conversion):
         self.energyUsed_kWh += timestep_h * (
             self.v_currentConsumptionMethane_kW - self.v_currentProductionHeat_kW
         )  # This represents losses!
+        return [
+            self.v_currentConsumptionElectric_kW,
+            self.v_currentConsumptionHeat_kW,
+            self.v_currentConsumptionMethane_kW,
+            self.v_currentConsumptionHydrogen_kW,
+            self.v_currentProductionElectric_kW,
+            self.v_currentProductionHeat_kW,
+            self.v_currentProductionMethane_kW,
+            self.v_currentProductionHydrogen_kW,
+        ]
 
 
 class EA_HeatDeliverySet(EA_Conversion):
@@ -313,3 +373,13 @@ class EA_HeatDeliverySet(EA_Conversion):
         self.energyUsed_kWh += timestep_h * (
             self.v_currentConsumptionHeat_kW - self.v_currentProductionHeat_kW
         )  # This represents losses!
+        return [
+            self.v_currentConsumptionElectric_kW,
+            self.v_currentConsumptionHeat_kW,
+            self.v_currentConsumptionMethane_kW,
+            self.v_currentConsumptionHydrogen_kW,
+            self.v_currentProductionElectric_kW,
+            self.v_currentProductionHeat_kW,
+            self.v_currentProductionMethane_kW,
+            self.v_currentProductionHydrogen_kW,
+        ]
