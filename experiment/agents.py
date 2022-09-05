@@ -1,4 +1,3 @@
-# agentsGH.py
 # import agentpy as ap
 
 # Keep this example agent as blueprint
@@ -10,7 +9,7 @@
 #     def agent_method(self):
 #         # Define custom actions here
 #         pass
-from genericpath import exists
+from array import array
 import random
 import numpy as np
 from energyAssets import *
@@ -125,7 +124,19 @@ class GridNode:
         # if self.nodeID == 'E1':
         #     print("Current HS grid load is " + str(self.v_currentLoadElectricity_kW) + ' kW, total imported electricity ' + str(self.totalImportedEnergy_kWh) + ' kWh, timestep ' +str(timestep_h))
 
+    def setTransportBuffer(self, initialTemp_degC):
+        self.transportBuffer = EA_StorageHeat(
+            None,
+            "Thermal Storage",
+            1000,
+            1e9,
+            100,
+            60,
+            initialTemp_degC,
+        )
 
+
+# @jitclass
 class GridConnection:
     def __init__(
         self,
@@ -302,20 +313,17 @@ class GridConnection:
                     self.EA_ThermalStorage.setPowerFraction(
                         -heatTransferToNetwork_kW / self.EA_ThermalStorage.capacity_kW
                     )
-                # self.EA_HeatingSystem.runAsset(timestep_h)
-                # self.EA_ThermalStorage.runAsset(timestep_h)
 
-        idx = 0
         for e in self.connectedAssets:
             if e.energyAssetType == "WINDMILL":
                 e.setPowerFraction(currentprofiles[OL_profiles.WIND])
-                # e.runAsset()
+
             if e.energyAssetType == "PHOTOVOLTAIC":
                 e.setPowerFraction(currentprofiles[OL_profiles.SOLAR])
-                # e.runAsset()
+
             if e.energyAssetType == "House_other_electricity":
                 e.setPowerFraction(currentprofiles[OL_profiles.HOME_ELEC])
-                # e.runAsset()
+
                 # print(
                 #     "HH other electricity demand "
                 #     + str(e.v_powerFraction_fr * e.capacity_kW)
@@ -329,14 +337,17 @@ class GridConnection:
                 #     + str(e.v_powerFraction_fr * e.capacity_kW)
                 #     + "kW"
                 # )
-            self.powerFlows[idx, :] = e.runAsset(timestep_h)
-            idx += 1
+            e.runAsset(timestep_h)
+
+        self.calculateEnergyBalance(timestep_h)
 
     def calculateEnergyBalance(self, timestep_h):
-        # self.v_currentLoadElectricity_kW = 0
-        # self.v_currentLoadHeat_kW = 0
-        # self.v_currentLoadMethane_kW = 0
-        # self.v_currentLoadHydrogen_kW = 0
+        # (
+        #     self.v_currentLoadElectricity_kW,
+        #     self.v_currentLoadHeat_kW,
+        #     self.v_currentLoadMethane_kW,
+        #     self.v_currentLoadHydrogen_kW,
+        # ) = (0, 0, 0, 0)
         # for e in self.connectedAssets:
         #     # print("Looping over connected assets")
         #     self.v_currentLoadElectricity_kW += (
@@ -351,11 +362,22 @@ class GridConnection:
         #     self.v_currentLoadHydrogen_kW += (
         #         e.v_currentConsumptionHydrogen_kW - e.v_currentProductionHydrogen_kW
         #     )
-        totalPowerFlows = np.sum(self.powerFlows, axis=0)
-        self.v_currentLoadElectricity_kW = totalPowerFlows[0] - totalPowerFlows[4]
-        self.v_currentLoadHeat_kW = totalPowerFlows[1] - totalPowerFlows[5]
-        self.v_currentLoadMethane_kW = totalPowerFlows[2] - totalPowerFlows[6]
-        self.v_currentLoadHydrogen_kW = totalPowerFlows[3] - totalPowerFlows[7]
+        self.v_currentLoadElectricity_kW = sum(
+            e.v_currentConsumptionElectric_kW - e.v_currentProductionElectric_kW
+            for e in self.connectedAssets
+        )
+        self.v_currentLoadHeat_kW = sum(
+            e.v_currentConsumptionHeat_kW - e.v_currentProductionHeat_kW
+            for e in self.connectedAssets
+        )
+        self.v_currentLoadMethane_kW = sum(
+            e.v_currentConsumptionMethane_kW - e.v_currentProductionMethane_kW
+            for e in self.connectedAssets
+        )
+        self.v_currentLoadHydrogen_kW = sum(
+            e.v_currentConsumptionHydrogen_kW - e.v_currentProductionHydrogen_kW
+            for e in self.connectedAssets
+        )
 
         self.v_electricityDrawn_kWh += (
             max(0, self.v_currentLoadElectricity_kW) * timestep_h
@@ -442,10 +464,12 @@ class ConnectionOwner:
 
     def updateFinances(self, timestep_h):
         # gather energy flows of owned connections
-        v_electricityVolume_kWh = 0
-        v_heatVolume_kWh = 0
-        v_methaneVolume_kWh = 0
-        v_hydrogenVolume_kWh = 0
+        (
+            v_electricityVolume_kWh,
+            v_heatVolume_kWh,
+            v_methaneVolume_kWh,
+            v_hydrogenVolume_kWh,
+        ) = (0, 0, 0, 0)
         for c in self.ownedConnections:
             v_electricityVolume_kWh += c.v_currentLoadElectricity_kW * timestep_h
             v_heatVolume_kWh += c.v_currentLoadHeat_kW * timestep_h
