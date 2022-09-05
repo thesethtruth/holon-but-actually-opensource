@@ -21,6 +21,15 @@ class OL_EnergyContract(Enum):
     HYDROGENFIXED = 5
 
 
+class OL_profiles:
+    HOME_ELEC = 1
+    WIND = 2
+    SOLAR = 3
+    AMBIENTTEMP = 4
+    ELEC_SPOTMARKET = 5
+    DHW = 6
+
+
 class EnergyAsset:
     def __init__(self, parentConnectionID, type, capacity_kW):
         # self.AssetID = AssetID

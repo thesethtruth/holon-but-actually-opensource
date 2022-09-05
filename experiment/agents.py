@@ -207,17 +207,17 @@ class GridConnection:
         elif connectedAsset.energyAssetType == "Thermal Storage":
             self.EA_ThermalStorage = connectedAsset
 
-    def manageAssets(self, t, timestep_h, df_profiles):
+    def manageAssets(self, t, timestep_h, currentprofiles):
         # print("Managing EnergyAssets")
         for e in self.connectedAssets:
             if e.energyAssetType == "WINDMILL":
-                e.setPowerFraction(df_profiles.wind_e_prod_normalized.array[0])
+                e.setPowerFraction(currentprofiles[OL_profiles.WIND])
                 e.runAsset()
             if e.energyAssetType == "PHOTOVOLTAIC":
-                e.setPowerFraction(df_profiles.solar_e_prod_normalized.array[0])
+                e.setPowerFraction(currentprofiles[OL_profiles.SOLAR])
                 e.runAsset()
             if e.energyAssetType == "House_other_electricity":
-                e.setPowerFraction(df_profiles.hh_e_demand_other.array[0])
+                e.setPowerFraction(currentprofiles[OL_profiles.HOME_ELEC])
                 e.runAsset()
                 # print(
                 #     "HH other electricity demand "
@@ -225,10 +225,7 @@ class GridConnection:
                 #     + "kW"
                 # )
             if e.energyAssetType == "House_hot_water":
-                e.setPowerFraction(df_profiles.hh_DHW_demand.array[0])
-                e.runAsset()
-            if e.energyAssetType == "PHOTOVOLTAIC":
-                e.setPowerFraction(df_profiles.solar_e_prod_normalized.array[0])
+                e.setPowerFraction(currentprofiles[OL_profiles.DHW])
                 e.runAsset()
                 # print(
                 #     "PV production household "
@@ -258,7 +255,7 @@ class GridConnection:
                 tempSetpoint_degC = 20
                 houseTemp_degC = self.EA_ThermalStorage.storageTemp_degC
                 self.EA_ThermalStorage.updateAmbientTemperature(
-                    df_profiles.ambientTemperature_degC.array[0]
+                    currentprofiles[OL_profiles.AMBIENTTEMP]
                 )
                 if houseTemp_degC < tempSetpoint_degC:
                     # //traceln("heatCapacity heatingSystem " + p_spaceHeatingAsset.p_energyAssetInstance.getHeatCapacity_kW());
@@ -310,7 +307,7 @@ class GridConnection:
                 #     + " degC"
                 # )
                 self.EA_ThermalStorage.updateAmbientTemperature(
-                    df_profiles.ambientTemperature_degC.array[0]
+                    currentprofiles[OL_profiles.AMBIENTTEMP]
                 )
                 if storageTemp_degC < tempSetpoint_degC:
                     # //traceln("heatCapacity heatingSystem " + p_spaceHeatingAsset.p_energyAssetInstance.getHeatCapacity_kW());
@@ -639,6 +636,6 @@ class NationalMarket:
         return self.currentNationalElectricityPrice_eurpkWh
 
 
-def gridConnectionPowerflows(c: GridConnection, t, timestep_h, df_currentprofiles):
-    c.manageAssets(t, timestep_h, df_currentprofiles)
+def gridConnectionPowerflows(c: GridConnection, t, timestep_h, currentprofiles):
+    c.manageAssets(t, timestep_h, currentprofiles)
     c.calculateEnergyBalance(timestep_h)

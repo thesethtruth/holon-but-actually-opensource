@@ -16,7 +16,7 @@ df_energyAssets = pd.read_excel(configexcell, "config_energyAssets")
 
 # Load profiles from profiles excell
 profilesexcell = pd.ExcelFile("./db_profiles.xlsx")
-df_profiles = pd.read_excel(profilesexcell, "profiles")
+profiles_array = pd.read_excel(profilesexcell, "profiles").to_numpy()
 
 # Load parameters from params excell
 paramsexcell = pd.ExcelFile("./db_backboneParams.xlsx")
@@ -152,7 +152,7 @@ for idx in df_gridConnections.index.array:
                 1e7,
                 100,
                 20,
-                df_profiles.ambientTemperature_degC.array[0],
+                profiles_array[0, OL_profiles.AMBIENTTEMP],
             )
         )
         # add heating system
@@ -192,7 +192,7 @@ for idx in df_gridConnections.index.array:
                 1e8,
                 1000,
                 60,
-                df_profiles.ambientTemperature_degC.array[0],
+                profiles_array[0, OL_profiles.AMBIENTTEMP],
             )
         )
         # add heating system
@@ -268,19 +268,19 @@ for o in pop_connectionOwners:
 for h in pop_energyHolons:
     h.connectToParents(pop_energySuppliers)
 
-df_profilecolumns = df_profiles.columns
-##############################################
+# df_profilecolumns = df_profiles.columns
+##############################################cd
 ## Simulate! Loop over timesteps
 for t in np.arange(
-    0, 24 * 7, timestep_h
+    0, 24 * 7 * 52, timestep_h
 ):  ## Just 10 steps for now, for testing. Will be 8760 later of course.
     ## Update profiles
-    # df_currentprofiles = df_profiles.loc[[round(t)]]
-    df_currentvalues = df_profiles.values[t, :]
+    currentprofiles = profiles_array[t, :]
+    # df_currentvalues = df_profiles.values[t, :]
 
     ## Propagate incentives
     nationalMarket.updateNationalElectricityPrice(
-        df_currentprofiles.Day_ahead_Price_EURpMWh.array[0]
+        currentprofiles[OL_profiles.ELEC_SPOTMARKET]
     )
     for e in pop_energySuppliers:
         e.updateEnergyPrice(nationalMarket)
@@ -288,7 +288,7 @@ for t in np.arange(
     ## Propagate powerflows
     # t0gC = time.time()
     for c in pop_gridConnections:
-        c.manageAssets(t, timestep_h, df_currentprofiles)
+        c.manageAssets(t, timestep_h, currentprofiles)
         c.calculateEnergyBalance(timestep_h)
 
     # [pop_gridConnections[i].manageAssets(t, timestep_h, df_currentprofiles) for i in range(len(pop_gridConnections))] # Not faster than normal loop...
