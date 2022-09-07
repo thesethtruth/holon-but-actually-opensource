@@ -31,7 +31,6 @@ undergroundTemp_degC = df_params.value[
 tripsexcell = pd.ExcelFile("./AlbatrossProcessedVehicleTrips.xlsx")
 tripsarray = pd.read_excel(tripsexcell).to_numpy()
 
-
 ################
 ## Populate agent populations
 pop_gridNodes = []
@@ -56,32 +55,54 @@ nationalMarket = NationalMarket(0)
 #         )
 #     )
 
-for idx in df_gridNodes.index:
-    pop_gridNodes.append(
-        GridNode(
-            df_gridNodes.id[idx],
-            df_gridNodes.type[idx],
-            df_gridNodes.capacity_kw[idx],
-            df_gridNodes.type2[idx],
-            df_gridNodes.parent[idx],
-        )
+pop_gridNodes = [
+    GridNode(
+        df_gridNodes.id[idx],
+        df_gridNodes.type[idx],
+        df_gridNodes.capacity_kw[idx],
+        df_gridNodes.type2[idx],
+        df_gridNodes.parent[idx],
     )
-    if df_gridNodes.type[idx] == "HEAT":
-        pop_gridNodes[idx].transportBuffer = EA_StorageHeat(
-            None,
-            "Thermal Storage",
-            1000,
-            1e9,
-            100,
-            60,
-            df_params.value.array[1],
-        )
+    for idx in range(len(df_gridNodes))
+]
 
-# Make links between gridNodes
-for x in pop_gridNodes:
-    x.connectToParent(pop_gridNodes)
-    # print(x.parentNode.nodeID)
+# [
+#     pop_gridNodes[idx].setTransportBuffer(df_params.value.array[1])
+#     for idx in range(len(pop_gridNodes))
+#     if pop_gridNodes[idx].energyCarrier == "HEAT"
+# ]
+[
+    gridNode.setTransportBuffer(df_params.value.array[1])
+    for gridNode in pop_gridNodes
+    if gridNode.energyCarrier == "HEAT"
+]
 
+# for idx in df_gridNodes.index:
+#     # pop_gridNodes.append(
+#     #     GridNode(
+#     #         df_gridNodes.id[idx],
+#     #         df_gridNodes.type[idx],
+#     #         df_gridNodes.capacity_kw[idx],
+#     #         df_gridNodes.type2[idx],
+#     #         df_gridNodes.parent[idx],
+#     #     )
+#     # )
+#     if df_gridNodes.type[idx] == "HEAT":
+#         pop_gridNodes[idx].transportBuffer = EA_StorageHeat(
+#             None,
+#             "Thermal Storage",
+#             1000,
+#             1e9,
+#             100,
+#             60,
+#             df_params.value.array[1],
+#         )
+
+# # Make links between gridNodes
+# for x in pop_gridNodes:
+#     x.connectToParent(pop_gridNodes)
+#     # print(x.parentNode.nodeID)
+[gridNode.connectToParent(pop_gridNodes) for gridNode in pop_gridNodes]
 
 # pop_gridConnections.append([
 #         GridConnection(
@@ -259,6 +280,8 @@ for e in pop_energyAssets:
 for c in pop_gridConnections:
     c.connectToParents(pop_gridNodes, pop_connectionOwners)
     # print(x.parentNode.nodeID)
+    # c.initPowerFlowArray()  # Prepare power-flow array
+
 
 # Make links between gridConnections and connectionOwners
 for o in pop_connectionOwners:
@@ -268,6 +291,8 @@ for o in pop_connectionOwners:
 for h in pop_energyHolons:
     h.connectToParents(pop_energySuppliers)
 
+t_init = time.time() - t1
+print("Initialisation time ".join([str(t_init), " seconds"]))
 # df_profilecolumns = df_profiles.columns
 ##############################################cd
 ## Simulate! Loop over timesteps
@@ -276,36 +301,23 @@ for t in np.arange(
 ):  ## Just 10 steps for now, for testing. Will be 8760 later of course.
     ## Update profiles
     currentprofiles = profiles_array[t, :]
-    # df_currentvalues = df_profiles.values[t, :]
 
     ## Propagate incentives
     nationalMarket.updateNationalElectricityPrice(
         currentprofiles[OL_profiles.ELEC_SPOTMARKET]
     )
+
     for e in pop_energySuppliers:
         e.updateEnergyPrice(nationalMarket)
 
     ## Propagate powerflows
-    # t0gC = time.time()
     for c in pop_gridConnections:
         c.manageAssets(t, timestep_h, currentprofiles)
-        c.calculateEnergyBalance(timestep_h)
-
-    # [pop_gridConnections[i].manageAssets(t, timestep_h, df_currentprofiles) for i in range(len(pop_gridConnections))] # Not faster than normal loop...
-    # [pop_gridConnections[i].calculateEnergyBalance(timestep_h) for i in range(len(pop_gridConnections))] # Not faster than normal loop...
-    # print(
-    #     "Time spent on gridConnections in one timestep: "
-    #     + str(time.time() - t0gC)
-    #     + " seconds"
-    # )
+        c.calculateEnergyBalance(timestep_h)  # bootstrapped in manageAssets function
 
     for n in pop_gridNodes:
         n.calculateEnergyBalance(timestep_h)
-    # print(
-    #     "Time spent on gridNodes in one timestep: "
-    #     + str(time.time() - t0gN)
-    #     + " seconds"
-    # )
+
     ## Financial transactions
     for o in pop_connectionOwners:
         o.updateFinances(timestep_h)
@@ -315,6 +327,27 @@ for t in np.arange(
 
     for e in pop_energySuppliers:
         e.updateFinances()
+
+    ## timestep print
+    # print("Timestep at t=" + str(t) + " hours")
+
+    # [e.updateEnergyPrice(nationalMarket) for e in pop_energySuppliers]
+
+    # ## Propagate powerflows
+    # # t0gC = time.time()
+    # [c.manageAssets(t, timestep_h, currentprofiles) for c in pop_gridConnections]
+    # # c.calculateEnergyBalance(timestep_h)
+
+    # # [pop_gridConnections[i].manageAssets(t, timestep_h, df_currentprofiles) for i in range(len(pop_gridConnections))] # Not faster than normal loop...
+    # # [pop_gridConnections[i].calculateEnergyBalance(timestep_h) for i in range(len(pop_gridConnections))] # Not faster than normal loop...
+
+    # [n.calculateEnergyBalance(timestep_h) for n in pop_gridNodes]
+
+    # [o.updateFinances(timestep_h) for o in pop_connectionOwners]
+
+    # [e.updateFinances() for e in pop_energyHolons]
+
+    # [e.updateFinances() for e in pop_energySuppliers]
 
     ## timestep print
     # print("Timestep at t=" + str(t) + " hours")

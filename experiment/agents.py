@@ -124,7 +124,16 @@ class GridNode:
 
         # if self.nodeID == 'E1':
         #     print("Current HS grid load is " + str(self.v_currentLoadElectricity_kW) + ' kW, total imported electricity ' + str(self.totalImportedEnergy_kWh) + ' kWh, timestep ' +str(timestep_h))
-
+    def setTransportBuffer(self, initialTemp_degC):
+        self.transportBuffer = EA_StorageHeat(
+            None,
+            "Thermal Storage",
+            1000,
+            1e9,
+            100,
+            60,
+            initialTemp_degC,
+        )
 
 class GridConnection:
     def __init__(
